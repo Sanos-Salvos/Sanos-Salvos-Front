@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
+
+// --- CONFIGURACIÓN DE CONEXIÓN AL GATEWAY ---
+const GATEWAY_URL = "http://localhost:8080/api/bff/pet";
 
 // Corrección de los iconos por defecto de Leaflet para entornos SPA
 delete L.Icon.Default.prototype._getIconUrl;
@@ -45,7 +48,6 @@ function App() {
 
   // --- NUEVO ESTADO PARA ALERTAS DE COINCIDENCIAS FLOTANTES  ---
   const [toast, setToast] = useState(null);
-
 
   const [usuariosRegistrados, setUsuariosRegistrados] = useState([
     { username: 'user@sanos.com', password: '123', role: 'USER' },
@@ -96,6 +98,29 @@ function App() {
       comentarios: []
     },
   ]);
+
+  // --- EFECTO DE SINCRONIZACIÓN CON EL GATEWAY ---
+  useEffect(() => {
+    const fetchRealData = async () => {
+      try {
+        const response = await fetch(`${GATEWAY_URL}/list`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.length > 0) {
+            // Unimos los datos reales con los mockeados sin duplicar por ID
+            setAvisos(prev => {
+              const existingIds = new Set(prev.map(a => a.id));
+              const newItems = data.filter(item => !existingIds.has(item.id));
+              return [...newItems, ...prev];
+            });
+          }
+        }
+      } catch (error) {
+        console.warn("Backend no detectado. Operando en modo local (Mock).");
+      }
+    };
+    fetchRealData();
+  }, []);
 
   const [organizaciones, setOrganizaciones] = useState([
     { id: 1, nombre: "Fundación Patitas A Salvo", rut: "12.345.678-9", comuna: "Ñuñoa", capacidad: "50 mascotas" },
@@ -222,18 +247,33 @@ function App() {
     setLoginForm({ username: registerForm.username, password: registerForm.password, isOrg: registerForm.isOrg });
   };
 
-  // --- COMPORTAMIENTOS DEL DASHBOARD INTERNO ---
-  const handlePublicar = (e) => {
+  // --- COMPORTAMIENTOS DEL DASHBOARD INTERNO (CONECTADO A GATEWAY) ---
+  const handlePublicar = async (e) => {
     e.preventDefault();
 
     const avisoCreado = {
       ...nuevoAviso,
-      id: avisos.length + 1,
       imagen: previewImage || '/mascotas/image1.jpg',
       comentarios: []
     };
 
-    setAvisos([avisoCreado, ...avisos]);
+    // 1. Persistencia Local Inmediata
+    const localId = Date.now();
+    setAvisos([{...avisoCreado, id: localId}, ...avisos]);
+
+    // 2. Persistencia Real en Docker vía Gateway
+    try {
+      const response = await fetch(`${GATEWAY_URL}/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(avisoCreado)
+      });
+      if (response.ok) {
+        console.log("Sincronizado con microservicios con éxito");
+      }
+    } catch (err) {
+      console.error("Error al sincronizar con el Gateway:", err);
+    }
 
     if (avisoCreado.especie === "Perro") {
       setCoincidencias([{
@@ -267,12 +307,12 @@ function App() {
   // --- FILTRADO DINÁMICO COMBINADO (Buscador + Píldoras de Estado + Selector de Especie) ---
   const avisosFiltrados = avisos.filter(a => {
     const matchesSearch =
-      a.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.comuna.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.raza.toLowerCase().includes(searchTerm.toLowerCase());
+      (a.nombre || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.comuna || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.raza || "").toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === 'TODOS' || a.estado === statusFilter;
-    const matchesSpecie = specieFilter === 'TODAS' || a.especie.toUpperCase() === specieFilter;
+    const matchesSpecie = specieFilter === 'TODAS' || a.especie?.toUpperCase() === specieFilter;
 
     return matchesSearch && matchesStatus && matchesSpecie;
   });
@@ -287,7 +327,6 @@ function App() {
           className="fixed-mini-logo"
         />
 
-        {/* COLUMNA IZQUIERDA */}
         <div className="login-side-panel left-panel">
           <div className="side-panel-title">📢 Reportes Recientes</div>
           <div className="mini-alert-card lost">
@@ -308,7 +347,6 @@ function App() {
           </div>
         </div>
 
-        {/* TARJETA CENTRAL DE LOGIN */}
         <div className="login-card">
           <img
             src={`${process.env.PUBLIC_URL}/logo.png`}
@@ -435,7 +473,6 @@ function App() {
           <span className="footer-token">Cifrado Perimetral & Tokens JWT - Gateway Auth</span>
         </div>
 
-        {/* COLUMNA DERECHA */}
         <div className="login-side-panel right-panel">
           <div className="side-panel-title">🔍 Últimos Avistamientos</div>
           <div className="mini-alert-card lost">
@@ -459,7 +496,6 @@ function App() {
   // --- VISTA 2: APLICACIÓN PRINCIPAL ---
   return (
     <div className="dashboard-container">
-      {/* Toast Flotante del Motor de Coincidencias */}
       {toast && <div className="floating-toast-alert">{toast}</div>}
 
       <aside className="sidebar">
@@ -489,7 +525,6 @@ function App() {
               <input type="text" placeholder="Buscar por nombre, raza o comuna..." className="search-bar" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
 
-            {/* BARRA DE FILTROS AVANZADOS COMBINADOS */}
             <div className="advanced-filter-ribbon">
               <div className="status-pill-group">
                 <button className={`pill-btn ${statusFilter === 'TODOS' ? 'active' : ''}`} onClick={() => setStatusFilter('TODOS')}>Todos ({avisos.length})</button>
@@ -506,7 +541,6 @@ function App() {
               </div>
             </div>
 
-            {/* VISOR DE GEOLOCALIZACIÓN NATIVO CON OPENSTREETMAP */}
             <div className="real-map-wrapper">
               <MapContainer center={[-33.4372, -70.6506]} zoom={11} style={{ height: "300px", width: "100%", borderRadius: "16px" }}>
                 <TileLayer
@@ -526,7 +560,6 @@ function App() {
               <div className="map-badge-info">Visor Activo — OpenStreetMap & Leaflet</div>
             </div>
 
-            {/* GRIDS DE TARJETAS */}
             <div className="cards-grid">
               {avisosFiltrados.map(aviso => (
                 <div
@@ -564,7 +597,6 @@ function App() {
           </div>
         )}
 
-        {/* --- MODAL FLOTANTE DE DETALLES CON SECCIÓN DE COMENTARIOS/PISTAS --- */}
         {avisoSeleccionado && (
           <div className="modal-overlay" onClick={() => setAvisoSeleccionado(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -590,7 +622,6 @@ function App() {
                   <p><strong>📍 Sector / Comuna:</strong> {avisoSeleccionado.comuna}</p>
                   <p><strong>🌐 Geolocalización:</strong> Lat: {avisoSeleccionado.lat.toFixed(4)} | Lng: {avisoSeleccionado.lng.toFixed(4)}</p>
 
-                  {/* SISTEMA DE INTEGRACIÓN DE PISTAS DE AVISTAMIENTOS */}
                   <div className="modal-comments-section">
                     <h3>📌 Pistas y Avistamientos de la Red Civil</h3>
                     <div className="comments-log-container">
@@ -681,7 +712,6 @@ function App() {
                 <button type="submit" className="btn-submit">Despachar Alerta</button>
               </form>
 
-              {/* Mini-mapa interactivo para capturar clics espaciales */}
               <div className="interactive-capture-map">
                 <label className="map-capture-label">Haz clic en el punto de pérdida/avistamiento:</label>
                 <MapContainer center={[-33.4372, -70.6506]} zoom={12} style={{ height: "340px", width: "100%", borderRadius: "12px" }}>
@@ -713,25 +743,28 @@ function App() {
                       <input type="text" placeholder="11.222.333-4" required value={nuevaOrg.rut} onChange={e => setNuevaOrg({ ...nuevaOrg, rut: e.target.value })} />
                     </div>
                     <div className="form-field">
-                      <label>Comuna Base</label>
+                      <label>Comuna Sede</label>
                       <input type="text" required value={nuevaOrg.comuna} onChange={e => setNuevaOrg({ ...nuevaOrg, comuna: e.target.value })} />
                     </div>
                     <div className="form-field">
-                      <label>Capacidad Máxima</label>
-                      <input type="text" required value={nuevaOrg.capacity} onChange={e => setNuevaOrg({ ...nuevaOrg, capacity: e.target.value })} />
+                      <label>Capacidad Cupos</label>
+                      <input type="text" placeholder="Ej: 30 mascotas" required value={nuevaOrg.capacity} onChange={e => setNuevaOrg({ ...nuevaOrg, capacity: e.target.value })} />
                     </div>
-                    <button type="submit" className="btn-submit">Guardar Base de Datos</button>
+                    <button type="submit" className="btn-submit">Registrar Organización</button>
                   </form>
                 </div>
               )}
-              <div className="org-grid">
-                {organizaciones.map(o => (
-                  <div key={o.id} className="org-card">
-                    <div className="org-icon">🏢</div>
-                    <h3>{o.nombre}</h3>
-                    <p><strong>RUT:</strong> {o.rut}</p>
-                    <p><strong>📍 Comuna:</strong> {o.comuna}</p>
-                    <span className="badge-active">Verificada</span>
+              <div className="org-cards-container">
+                {organizaciones.map(org => (
+                  <div key={org.id} className="org-info-card">
+                    <div className="org-header">
+                      <span className="org-icon">🏢</span>
+                      <h3>{org.nombre}</h3>
+                    </div>
+                    <p><strong>RUT:</strong> {org.rut}</p>
+                    <p><strong>Comuna:</strong> {org.comuna}</p>
+                    <p><strong>Cupos:</strong> {org.capacidad || org.capacity}</p>
+                    <button className="btn-secondary-outline">Contactar Entidad</button>
                   </div>
                 ))}
               </div>
@@ -742,17 +775,22 @@ function App() {
         {activeTab === 'coincidencias' && (
           <div>
             <div className="content-header">
-              <h2>Motor de Coincidencias</h2>
+              <h2>🤝 Motor de Coincidencias de IA (Beta)</h2>
+              <p>Basado en algoritmos de geolocalización y reconocimiento morfológico.</p>
             </div>
-            <div className="coincidencias-list">
+            <div className="coincidence-grid">
               {coincidencias.map(c => (
-                <div key={c.id} className="coincidencia-item">
+                <div key={c.id} className="coincidence-card">
                   <div className="coin-header">
-                    <span className="coin-percentage">🔥 {c.porcentaje}% de Match</span>
-                    <span className="coin-status">{c.estado}</span>
+                    <span className="coin-percentage">{c.porcentaje}% de match</span>
+                    <span className={`coin-status ${c.estado.toLowerCase()}`}>{c.estado}</span>
                   </div>
-                  <h3>Mascota: {c.perdida}</h3>
-                  <p className="coin-desc">💡 {c.encontrada}</p>
+                  <h4>Caso: {c.perdida}</h4>
+                  <p className="coin-desc">{c.encontrada}</p>
+                  <div className="coin-actions">
+                    <button className="btn-match-verify">Verificar Cruce</button>
+                    <button className="btn-match-discard">Descartar</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -764,4 +802,3 @@ function App() {
 }
 
 export default App;
-
