@@ -8,7 +8,7 @@ Interfaz de usuario desarrollada en React con mapas Leaflet
 
 ## Base de datos
 
-N/A
+Sin base de datos propia - interfaz React que consume la API del BFF
 
 ## Endpoints disponibles
 
