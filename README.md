@@ -1,36 +1,31 @@
-﻿# 🏥 Sanos-Salvos-Front
+﻿# Sanos-Salvos-Front
 
-Interfaz de usuario React
+Interfaz de usuario desarrollada en React con mapas Leaflet
 
 ## Puerto
-\\\
+
 3000
-\\\
 
 ## Base de datos
-\\\
+
 N/A
-\\\
 
-## Endpoints
-\\\
-http://localhost:3000
-\\\
+## Endpoints disponibles
 
-## Ejecución
+Acceso web en http://localhost:3000
 
-### Docker
-\\\ash
+## Ejecucion con Docker
+
 docker-compose up --build
-\\\
 
-### Manual
-\\\ash
+## Ejecucion manual
+
 mvn spring-boot:run
-\\\
 
-## Stack
+## Tecnologias
+
 - Java 21
 - Spring Boot 3.2
+- Spring Security + JWT
 - PostgreSQL
 - Docker
