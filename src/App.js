@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
+import { listarMascotas, crearMascota } from './api/mascotaService';
+import { listarOrganizaciones, crearOrganizacion } from './api/organizacionService';
+import { listarCoincidencias } from './api/coincidenciaService';
+import { login as apiLogin, register as apiRegister } from './api/authService';
 
-// Corrección de los iconos por defecto de Leaflet para entornos SPA
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -25,88 +28,86 @@ const iconEncontrado = new L.Icon({
 });
 
 function App() {
-  // --- ESTADOS GLOBALES DE SESIÓN ---
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState('USER'); // USER o ADMIN_ORG
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return !!localStorage.getItem('luna_token');
+  });
+  const [authToken, setAuthToken] = useState(() => {
+    return localStorage.getItem('luna_token') || null;
+  });
+  const [userRole, setUserRole] = useState(() => {
+    return localStorage.getItem('luna_rol') || 'USER';
+  });
   const [activeTab, setActiveTab] = useState('avisos');
   const [searchTerm, setSearchTerm] = useState('');
-
-  // --- NUEVOS ESTADOS PARA FILTROS AVANZADOS ---
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [specieFilter, setSpecieFilter] = useState('TODAS');
-
-  // --- ESTADO PARA VER ANUNCIO EN GRANDE (MODAL) ---
   const [avisoSeleccionado, setAvisoSeleccionado] = useState(null);
-
-  // --- ESTADOS DE AUTENTICACION ---
   const [isRegistering, setIsRegistering] = useState(false);
-  const [loginForm, setLoginForm] = useState({ username: '', password: '', isOrg: false });
+  const [loginForm, setLoginForm] = useState(() => {
+    const saved = localStorage.getItem('luna_remember');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return { username: data.username || '', password: data.password || '', isOrg: false, rememberMe: true };
+      } catch { /* ignore */ }
+    }
+    return { username: '', password: '', isOrg: false, rememberMe: false };
+  });
   const [registerForm, setRegisterForm] = useState({ username: '', password: '', confirmPassword: '', isOrg: false, nombreOrg: '', rut: '' });
-
-  // --- NUEVO ESTADO PARA ALERTAS DE COINCIDENCIAS FLOTANTES  ---
   const [toast, setToast] = useState(null);
+  const [toastType, setToastType] = useState('success');
 
+  const [avisos, setAvisos] = useState([]);
+  const [cargando, setCargando] = useState(true);
 
-  const [usuariosRegistrados, setUsuariosRegistrados] = useState([
-    { username: 'user@sanos.com', password: '123', role: 'USER' },
-    { username: 'fundacion@sanos.com', password: '123', role: 'ADMIN_ORG' }
-  ]);
+  useEffect(() => {
+    async function cargarMascotas() {
+      try {
+        const data = await listarMascotas();
+        setAvisos(data);
+      } catch (error) {
+        console.error('Error cargando mascotas del BFF:', error);
+      } finally {
+        setCargando(false);
+      }
+    }
+    cargarMascotas();
+  }, []);
 
-  // --- DATOS MOCKADOS DE MASCOTAS ---
-  const [avisos, setAvisos] = useState([
-    {
-      id: 1,
-      nombre: "Firulais",
-      especie: "Perro",
-      raza: "Mestizo",
-      estado: "PERDIDO",
-      lat: -33.4420,
-      lng: -70.6580,
-      comuna: "Santiago Centro",
-      contacto: "+56911112222",
-      imagen: "/mascotas/image1.jpg",
-      comentarios: [
-        { autor: 'Vecino_Santi', texto: 'Vi a un perrito similar corriendo asustado cerca del Metro Los Héroes.', fecha: '12-05-2026 20:15' }
-      ]
-    },
-    {
-      id: 2,
-      nombre: "Luna",
-      especie: "Gato",
-      raza: "Siamés",
-      estado: "ENCONTRADO",
-      lat: -33.4250,
-      lng: -70.6150,
-      comuna: "Providencia",
-      contacto: "+56933334444",
-      imagen: "/mascotas/image2.jpg",
-      comentarios: []
-    },
-    {
-      id: 3,
-      nombre: "Thor",
-      especie: "Perro",
-      raza: "Golden",
-      estado: "PERDIDO",
-      lat: -33.4800,
-      lng: -70.6120,
-      comuna: "San Miguel",
-      contacto: "+56955556666",
-      imagen: "/mascotas/image3.jpg",
-      comentarios: []
-    },
-  ]);
+  const [organizaciones, setOrganizaciones] = useState([]);
+  const [cargandoOrgs, setCargandoOrgs] = useState(true);
 
-  const [organizaciones, setOrganizaciones] = useState([
-    { id: 1, nombre: "Fundación Patitas A Salvo", rut: "12.345.678-9", comuna: "Ñuñoa", capacidad: "50 mascotas" },
-    { id: 2, nombre: "Rescate Animal Chile", rut: "76.999.111-k", comuna: "Maipú", capacity: "120 mascotas" },
-  ]);
+  useEffect(() => {
+    async function cargarOrganizaciones() {
+      try {
+        const data = await listarOrganizaciones();
+        setOrganizaciones(data);
+      } catch (error) {
+        console.error('Error cargando organizaciones del BFF:', error);
+      } finally {
+        setCargandoOrgs(false);
+      }
+    }
+    cargarOrganizaciones();
+  }, []);
 
-  const [coincidencias, setCoincidencias] = useState([
-    { id: 101, perdida: "Thor (Golden)", encontrada: "Mascota similar reportada en San Miguel", porcentaje: 95, estado: "PENDIENTE" }
-  ]);
+  const [coincidencias, setCoincidencias] = useState([]);
+  const [cargandoCoincidencias, setCargandoCoincidencias] = useState(true);
 
-  // Formulario extendido para soportar coordenadas exactas por mapa
+  useEffect(() => {
+    async function cargarCoincidencias() {
+      try {
+        const data = await listarCoincidencias();
+        setCoincidencias(data);
+      } catch (error) {
+        console.error('Error cargando coincidencias del BFF:', error);
+      } finally {
+        setCargandoCoincidencias(false);
+      }
+    }
+    cargarCoincidencias();
+  }, []);
+
   const [nuevoAviso, setNuevoAviso] = useState({
     nombre: '', especie: 'Perro', raza: '', estado: 'PERDIDO',
     comuna: '', contacto: '', imagen: '',
@@ -116,46 +117,42 @@ function App() {
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [nuevaOrg, setNuevaOrg] = useState({ nombre: '', rut: '', comuna: '', capacity: '' });
 
-  // Función utilitaria para gatillar alertas de cruces del Motor de IA
-  const triggerToast = (mensaje) => {
+  const triggerToast = (mensaje, tipo = 'success') => {
     setToast(mensaje);
+    setToastType(tipo);
     setTimeout(() => setToast(null), 6000);
   };
 
-  // --- MANEJO DE IMÁGENES CON VISTA PREVIA NATIVA ---
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviewImage(reader.result);
+        setNuevoAviso(prev => ({ ...prev, imagen: reader.result }));
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // --- SUBCOMPONENTE LEAFLET: Captura clics del usuario en el mapa de publicación ---
   function MapClickHandler() {
     useMapEvents({
       click: (e) => {
         setNuevoAviso(prev => ({ ...prev, lat: e.latlng.lat, lng: e.latlng.lng }));
-        triggerToast("📍 Coordenadas capturadas con éxito en el formulario perimetral.");
+        triggerToast("Coordenadas capturadas con exito.");
       },
     });
     return null;
   }
 
-  // --- ENVIAR COMENTARIO REAL AL MODAL EN TIEMPO REAL ---
   const handleAddComment = (e) => {
     e.preventDefault();
     if (!nuevoComentario.trim()) return;
-
     const comentarioObj = {
-      autor: userRole === 'ADMIN_ORG' || userRole === 'ADMIN_ORGANIZACION' ? 'Organización_Verificada' : 'Usuario_Común',
+      autor: userRole === 'ADMIN_ORG' || userRole === 'ADMIN_ORGANIZACION' ? 'Organizacion_Verificada' : 'Usuario_Comun',
       texto: nuevoComentario,
       fecha: new Date().toLocaleString()
     };
-
     const nuevosAvisos = avisos.map(a => {
       if (a.id === avisoSeleccionado.id) {
         const updatedAviso = { ...a, comentarios: [...(a.comentarios || []), comentarioObj] };
@@ -164,321 +161,287 @@ function App() {
       }
       return a;
     });
-
     setAvisos(nuevosAvisos);
     setNuevoComentario('');
   };
 
-  // --- COMPORTAMIENTOS DE AUTENTICACIÓN ---
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    const usuarioEncontrado = usuariosRegistrados.find(u =>
-      u.username.toLowerCase() === loginForm.username.toLowerCase() &&
-      u.password === loginForm.password
-    );
-
-    if (usuarioEncontrado) {
-      const rolSeleccionado = loginForm.isOrg ? 'ADMIN_ORG' : 'USER';
-      if (usuarioEncontrado.role !== rolSeleccionado) {
-        alert(`Error: Esta cuenta no está registrada como ${loginForm.isOrg ? 'Organización' : 'Usuario Común'}.`);
-        return;
+    try {
+      const response = await apiLogin(loginForm.username, loginForm.password);
+      // Remember me
+      if (loginForm.rememberMe) {
+        localStorage.setItem('luna_remember', JSON.stringify({ username: loginForm.username, password: loginForm.password }));
+        localStorage.setItem('luna_token', response.token);
+        localStorage.setItem('luna_rol', response.rol || rolSeleccionado);
+      } else {
+        localStorage.removeItem('luna_remember');
+        localStorage.removeItem('luna_token');
+        localStorage.removeItem('luna_rol');
       }
-      setUserRole(usuarioEncontrado.role);
+      setAuthToken(response.token);
+      const rolSeleccionado = loginForm.isOrg ? 'ADMIN_ORG' : 'USER';
+      setUserRole(response.rol || rolSeleccionado);
       setIsLoggedIn(true);
-      alert("¡Sesión iniciada con éxito!");
-    } else {
-      alert("Credenciales inválidas. Inténtalo de nuevo o crea una cuenta.");
+    } catch (error) {
+      triggerToast("Credenciales inválidas: " + error.message, 'error');
     }
   };
 
-  const handleRegisterSubmit = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     if (registerForm.password !== registerForm.confirmPassword) {
-      alert("Las contraseñas no coinciden.");
+      triggerToast("Las contraseñas no coinciden.", 'error');
       return;
     }
-    const existe = usuariosRegistrados.some(u => u.username.toLowerCase() === registerForm.username.toLowerCase());
-    if (existe) {
-      alert("Este correo electrónico ya existe.");
-      return;
+    try {
+      const rol = registerForm.isOrg ? 'ADMIN_ORG' : 'USER';
+      await apiRegister(registerForm.username, registerForm.password, [rol]);
+      triggerToast("Cuenta creada con éxito!");
+      setIsRegistering(false);
+      setLoginForm({ username: registerForm.username, password: registerForm.password, isOrg: registerForm.isOrg });
+    } catch (error) {
+      triggerToast("Error al registrar: " + error.message, 'error');
     }
-    const nuevoRol = registerForm.isOrg ? 'ADMIN_ORG' : 'USER';
-    setUsuariosRegistrados([...usuariosRegistrados, {
-      username: registerForm.username,
-      password: registerForm.password,
-      role: nuevoRol
-    }]);
-    if (registerForm.isOrg && registerForm.nombreOrg) {
-      setOrganizaciones([...organizaciones, {
-        id: organizaciones.length + 1,
-        nombre: registerForm.nombreOrg,
-        rut: registerForm.rut || "Pendiente",
-        comuna: "Por Definir",
-        capacidad: "Por Configurar"
-      }]);
-    }
-    alert("¡Cuenta creada con éxito! Ahora puedes iniciar sesión.");
-    setIsRegistering(false);
-    setLoginForm({ username: registerForm.username, password: registerForm.password, isOrg: registerForm.isOrg });
   };
 
-  // --- COMPORTAMIENTOS DEL DASHBOARD INTERNO ---
-  const handlePublicar = (e) => {
+  const handlePublicar = async (e) => {
     e.preventDefault();
+    try {
+      const mascotaCreada = await crearMascota({
+        nombre: nuevoAviso.nombre,
+        especie: nuevoAviso.especie,
+        raza: nuevoAviso.raza,
+        estado: nuevoAviso.estado,
+        lat: nuevoAviso.lat,
+        lng: nuevoAviso.lng,
+        comuna: nuevoAviso.comuna,
+        contacto: nuevoAviso.contacto,
+        imagen: nuevoAviso.imagen
+      });
 
-    const avisoCreado = {
-      ...nuevoAviso,
-      id: avisos.length + 1,
-      imagen: previewImage || '/mascotas/image1.jpg',
-      comentarios: []
-    };
+      // Recargar toda la lista desde el servidor
+      const dataActualizada = await listarMascotas();
+      setAvisos(dataActualizada);
 
-    setAvisos([avisoCreado, ...avisos]);
+      triggerToast("Aviso publicado con éxito!");
+      setNuevoAviso({ nombre: '', especie: 'Perro', raza: '', estado: 'PERDIDO', comuna: '', contacto: '', imagen: '', lat: -33.4372, lng: -70.6506 });
+      setPreviewImage(null);
+      setActiveTab('avisos');
 
-    if (avisoCreado.especie === "Perro") {
-      setCoincidencias([{
-        id: coincidencias.length + 101,
-        perdida: `${avisoCreado.nombre} (${avisoCreado.raza})`,
-        encontrada: `Alerta de geolocalización detectada en radio de 2km (${avisoCreado.comuna})`,
-        porcentaje: 88,
-        estado: "VERIFICANDO"
-      }, ...coincidencias]);
+    } catch (error) {
+      console.error('Error al publicar:', error);
+      triggerToast("Error al guardar en el servidor: " + error.message);
     }
-
-    alert("¡Aviso publicado con éxito!");
-
-    setNuevoAviso({ nombre: '', especie: 'Perro', raza: '', estado: 'PERDIDO', comuna: '', contacto: '', imagen: '', lat: -33.4372, lng: -70.6506 });
-    setPreviewImage(null);
-    setActiveTab('avisos');
-
-    setTimeout(() => {
-      triggerToast(`🚨 ¡ALERTA DE COINCIDENCIA! El motor ha detectado una mascota ${avisoCreado.estado === 'PERDIDO' ? 'encontrada' : 'perdida'} con un 88% de similitud de coordenadas en la zona de ${avisoCreado.comuna}.`);
-    }, 3000);
   };
 
-  const handleRegistrarOrg = (e) => {
+  const handleRegistrarOrg = async (e) => {
     e.preventDefault();
-    setOrganizaciones([...organizaciones, { ...nuevaOrg, id: organizaciones.length + 1 }]);
-    alert("Organización registrada.");
-    setNuevaOrg({ nombre: '', rut: '', comuna: '', capacity: '' });
-    setActiveTab('organizaciones');
+    try {
+      await crearOrganizacion({
+        nombre: nuevaOrg.nombre,
+        tipo: 'REFUGIO',
+        direccion: nuevaOrg.comuna,
+        telefono: '',
+        email: ''
+      });
+      const dataActualizada = await listarOrganizaciones();
+      setOrganizaciones(dataActualizada);
+      triggerToast("Organización registrada con éxito!");
+      setNuevaOrg({ nombre: '', rut: '', comuna: '', capacity: '' });
+      setActiveTab('organizaciones');
+    } catch (error) {
+      console.error('Error al registrar organizacion:', error);
+      triggerToast("Error al guardar en el servidor: " + error.message);
+    }
   };
 
-  // --- FILTRADO DINÁMICO COMBINADO (Buscador + Píldoras de Estado + Selector de Especie) ---
   const avisosFiltrados = avisos.filter(a => {
     const matchesSearch =
-      a.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.comuna.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.raza.toLowerCase().includes(searchTerm.toLowerCase());
-
+      (a.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.comuna || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.raza || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'TODOS' || a.estado === statusFilter;
-    const matchesSpecie = specieFilter === 'TODAS' || a.especie.toUpperCase() === specieFilter;
-
+    const matchesSpecie = specieFilter === 'TODAS' || (a.especie || '').toUpperCase() === specieFilter;
     return matchesSearch && matchesStatus && matchesSpecie;
   });
 
-  // --- VISTA 1: PORTAL DE ACCESO LOGIN  ---
+  const avisosConCoordenadas = avisosFiltrados.filter(a => a.lat != null && a.lng != null);
+
   if (!isLoggedIn) {
     return (
       <div className="login-page">
-        <img
-          src={`${process.env.PUBLIC_URL}/logo.png`}
-          alt="Sanos y Salvos Mini Logo"
-          className="fixed-mini-logo"
-        />
-
-        {/* COLUMNA IZQUIERDA */}
+        <img src={process.env.PUBLIC_URL + '/logo.png'} alt="Logo" className="fixed-mini-logo" />
         <div className="login-side-panel left-panel">
-          <div className="side-panel-title">📢 Reportes Recientes</div>
-          <div className="mini-alert-card lost">
-            <div className="mini-card-avatar-box">
-              <img src="/mascotas/image1.jpg" alt="Firulais" className="mini-card-img" onError={(e) => { e.target.style.display = 'none'; }} />
-            </div>
-            <span className="mini-alert-badge lost">PERDIDO</span>
-            <h4>Firulais</h4>
-            <p>Mestizo • Santiago Centro</p>
-          </div>
-          <div className="mini-alert-card found">
-            <div className="mini-card-avatar-box">
-              <img src="/mascotas/image2.jpg" alt="Luna" className="mini-card-img" onError={(e) => { e.target.style.display = 'none'; }} />
-            </div>
-            <span className="mini-alert-badge found">ENCONTRADO</span>
-            <h4>Luna</h4>
-            <p>Siamés • Providencia</p>
-          </div>
+          <div className="side-panel-title">Reportes Recientes</div>
+          {(() => {
+            const perdidas = avisos.filter(a => a.estado === 'PERDIDO');
+            const encontradas = avisos.filter(a => a.estado === 'ENCONTRADO');
+            const randomPerdidas = [...perdidas].sort(() => Math.random() - 0.5).slice(0, 2);
+            const ultimaEncontrada = encontradas.length > 0 ? [encontradas[encontradas.length - 1]] : [];
+            const cardsMostrar = [...randomPerdidas, ...ultimaEncontrada];
+            return cardsMostrar.map((aviso, idx) => (
+              <div key={aviso.id || idx} className={`mini-alert-card ${aviso.estado === 'PERDIDO' ? 'lost' : 'found'}`}>
+                <div className="mini-card-avatar-box">
+                  {aviso.imagen ? (
+                    <img src={aviso.imagen} alt={aviso.nombre} className="mini-card-img" onError={(e) => { e.target.style.display = 'none'; }} />
+                  ) : (
+                    <span className="mini-card-emoji">{aviso.especie === 'Gato' ? '🐱' : '🐶'}</span>
+                  )}
+                </div>
+                <span className={`mini-alert-badge ${aviso.estado === 'PERDIDO' ? 'lost' : 'found'}`}>
+                  {aviso.estado}
+                </span>
+                <h4>{aviso.nombre}</h4>
+                <p>{aviso.raza} - {aviso.comuna}</p>
+              </div>
+            ));
+          })()}
         </div>
 
-        {/* TARJETA CENTRAL DE LOGIN */}
         <div className="login-card">
-          <img
-            src={`${process.env.PUBLIC_URL}/logo.png`}
-            alt="Sanos y Salvos Central Logo"
-            className="login-logo-img"
-          />
+          <img src={process.env.PUBLIC_URL + '/logo.png'} alt="Logo" className="login-logo-img" />
           <p>Portal unificado de asistencia y rastreo de mascotas</p>
-
           {!isRegistering ? (
             <form onSubmit={handleLoginSubmit} className="auth-form">
               <div className="form-field-auth">
-                <label>Correo Electrónico</label>
-                <input
-                  type="email"
-                  placeholder="ejemplo@sanos.com"
-                  required
-                  value={loginForm.username}
-                  onChange={e => setLoginForm({ ...loginForm, username: e.target.value })}
-                />
+                <label>Correo Electronico</label>
+                <input type="email" placeholder="ejemplo@sanos.com" required value={loginForm.username} onChange={e => setLoginForm({ ...loginForm, username: e.target.value })} />
               </div>
               <div className="form-field-auth">
-                <label>Contraseña</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                  value={loginForm.password}
-                  onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
-                />
+                <label>Contrasena</label>
+                <input type="password" placeholder="********" required value={loginForm.password} onChange={e => setLoginForm({ ...loginForm, password: e.target.value })} />
               </div>
-
               <div className="form-checkbox-auth">
-                <input
-                  type="checkbox"
-                  id="loginIsOrg"
-                  checked={loginForm.isOrg}
-                  onChange={e => setLoginForm({ ...loginForm, isOrg: e.target.checked })}
-                />
-                <label htmlFor="loginIsOrg">Soy una Organización / Fundación inscrita</label>
+                <input type="checkbox" id="loginRemember" checked={loginForm.rememberMe || false} onChange={e => setLoginForm({ ...loginForm, rememberMe: e.target.checked })} />
+                <label htmlFor="loginRemember">Recordarme</label>
               </div>
-
+              <div className="form-checkbox-auth">
+                <input type="checkbox" id="loginIsOrg" checked={loginForm.isOrg} onChange={e => setLoginForm({ ...loginForm, isOrg: e.target.checked })} />
+                <label htmlFor="loginIsOrg">Soy una Organizacion / Fundacion inscrita</label>
+              </div>
               <button type="submit" className="btn-auth-submit">Ingresar al Sistema</button>
-
-              <p className="auth-toggle-text">
-                ¿No tienes una cuenta? <span onClick={() => setIsRegistering(true)}>Crear una cuenta</span>
-              </p>
+              <p className="auth-toggle-text">No tienes una cuenta? <span onClick={() => setIsRegistering(true)}>Crear una cuenta</span></p>
             </form>
           ) : (
             <form onSubmit={handleRegisterSubmit} className="auth-form">
               <div className="form-field-auth">
-                <label>Correo Electrónico</label>
-                <input
-                  type="email"
-                  placeholder="correo@dominio.com"
-                  required
-                  value={registerForm.username}
-                  onChange={e => setRegisterForm({ ...registerForm, username: e.target.value })}
-                />
+                <label>Correo Electronico</label>
+                <input type="email" placeholder="correo@dominio.com" required value={registerForm.username} onChange={e => setRegisterForm({ ...registerForm, username: e.target.value })} />
               </div>
               <div className="form-field-auth">
-                <label>Establecer Contraseña</label>
-                <input
-                  type="password"
-                  placeholder="Mínimo 6 caracteres"
-                  required
-                  value={registerForm.password}
-                  onChange={e => setRegisterForm({ ...registerForm, password: e.target.value })}
-                />
+                <label>Contrasena</label>
+                <input type="password" placeholder="Minimo 6 caracteres" required value={registerForm.password} onChange={e => setRegisterForm({ ...registerForm, password: e.target.value })} />
               </div>
               <div className="form-field-auth">
-                <label>Confirmar Contraseña</label>
-                <input
-                  type="password"
-                  placeholder="Repita su contraseña"
-                  required
-                  value={registerForm.confirmPassword}
-                  onChange={e => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
-                />
+                <label>Confirmar Contrasena</label>
+                <input type="password" placeholder="Repita su contrasena" required value={registerForm.confirmPassword} onChange={e => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })} />
               </div>
-
               <div className="form-checkbox-auth">
-                <input
-                  type="checkbox"
-                  id="registerIsOrg"
-                  checked={registerForm.isOrg}
-                  onChange={e => setRegisterForm({ ...registerForm, isOrg: e.target.checked })}
-                />
-                <label htmlFor="registerIsOrg">Registrarme como Entidad/Organización</label>
+                <input type="checkbox" id="registerIsOrg" checked={registerForm.isOrg} onChange={e => setRegisterForm({ ...registerForm, isOrg: e.target.checked })} />
+                <label htmlFor="registerIsOrg">Registrarme como Entidad/Organizacion</label>
               </div>
-
               {registerForm.isOrg && (
                 <div className="animated-org-fields">
                   <div className="form-field-auth">
-                    <label>Nombre de la Fundación</label>
-                    <input
-                      type="text"
-                      placeholder="Ej: Fundación Huellitas"
-                      required={registerForm.isOrg}
-                      value={registerForm.nombreOrg}
-                      onChange={e => setRegisterForm({ ...registerForm, nombreOrg: e.target.value })}
-                    />
+                    <label>Nombre de la Fundacion</label>
+                    <input type="text" placeholder="Ej: Fundacion Huellitas" required={registerForm.isOrg} value={registerForm.nombreOrg} onChange={e => setRegisterForm({ ...registerForm, nombreOrg: e.target.value })} />
                   </div>
                   <div className="form-field-auth">
-                    <label>RUT de la Organización</label>
-                    <input
-                      type="text"
-                      placeholder="76.xxx.xxx-x"
-                      required={registerForm.isOrg}
-                      value={registerForm.rut}
-                      onChange={e => setRegisterForm({ ...registerForm, rut: e.target.value })}
-                    />
+                    <label>RUT de la Organizacion</label>
+                    <input type="text" placeholder="76.xxx.xxx-x" required={registerForm.isOrg} value={registerForm.rut} onChange={e => setRegisterForm({ ...registerForm, rut: e.target.value })} />
                   </div>
                 </div>
               )}
-
               <button type="submit" className="btn-auth-submit register">Registrar mi Cuenta</button>
-
-              <p className="auth-toggle-text">
-                ¿Ya posees una cuenta? <span onClick={() => setIsRegistering(false)}>Iniciar Sesión</span>
-              </p>
+              <p className="auth-toggle-text">Ya posees una cuenta? <span onClick={() => setIsRegistering(false)}>Iniciar Sesion</span></p>
             </form>
           )}
-
-          <span className="footer-token">Cifrado Perimetral & Tokens JWT - Gateway Auth</span>
+          <span className="footer-token">Cifrado Perimetral y Tokens JWT - Gateway Auth</span>
         </div>
 
-        {/* COLUMNA DERECHA */}
         <div className="login-side-panel right-panel">
-          <div className="side-panel-title">🔍 Últimos Avistamientos</div>
-          <div className="mini-alert-card lost">
-            <div className="mini-card-avatar-box">
-              <img src="/mascotas/image3.jpg" alt="Thor" className="mini-card-img" onError={(e) => { e.target.style.display = 'none'; }} />
+          <div className="side-panel-title">Últimos Avistamientos</div>
+          {(() => {
+            const perdidas = avisos.filter(a => a.estado === 'PERDIDO');
+            const encontradas = avisos.filter(a => a.estado === 'ENCONTRADO');
+            const randomPerdida = [...perdidas].sort(() => Math.random() - 0.5).slice(0, 1);
+            const ultimaEncontrada = encontradas.length > 0 ? [encontradas[encontradas.length - 1]] : [];
+            const cardsMostrar = [...randomPerdida, ...ultimaEncontrada];
+            return cardsMostrar.map((aviso, idx) => (
+              <div key={aviso.id || idx} className={`mini-alert-card ${aviso.estado === 'PERDIDO' ? 'lost' : 'found'}`}>
+                <div className="mini-card-avatar-box">
+                  {aviso.imagen ? (
+                    <img src={aviso.imagen} alt={aviso.nombre} className="mini-card-img" onError={(e) => { e.target.style.display = 'none'; }} />
+                  ) : (
+                    <span className="mini-card-emoji">{aviso.especie === 'Gato' ? '🐱' : '🐶'}</span>
+                  )}
+                </div>
+                <span className={`mini-alert-badge ${aviso.estado === 'PERDIDO' ? 'lost' : 'found'}`}>
+                  {aviso.estado}
+                </span>
+                <h4>{aviso.nombre}</h4>
+                <p>{aviso.raza} - {aviso.comuna}</p>
+              </div>
+            ));
+          })()}
+          {organizaciones.length > 0 && (
+            <div className="mini-alert-card help">
+              <span className="mini-alert-badge org">AYUDA</span>
+              <h4>{organizaciones[0].nombre}</h4>
+              <p>Cupos disponibles - {organizaciones[0].comuna}</p>
             </div>
-            <span className="mini-alert-badge lost">PERDIDO</span>
-            <h4>Thor</h4>
-            <p>Golden • San Miguel</p>
-          </div>
-          <div className="mini-alert-card help">
-            <span className="mini-alert-badge org">AYUDA</span>
-            <h4>🏢 Refugio Huellitas</h4>
-            <p>Cupos disponibles • Ñuñoa</p>
-          </div>
+          )}
         </div>
+        {toast && (
+          <div className="custom-modal-overlay" onClick={() => setToast(null)}>
+            <div className={`custom-modal ${toastType === 'error' ? 'modal-error' : 'modal-success'}`} onClick={e => e.stopPropagation()}>
+              <div className="modal-icon">{toastType === 'error' ? '❌' : '✅'}</div>
+              <p className="modal-message">{toast}</p>
+              <button className="modal-close-btn" onClick={() => setToast(null)}>Aceptar</button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // --- VISTA 2: APLICACIÓN PRINCIPAL ---
   return (
     <div className="dashboard-container">
-      {/* Toast Flotante del Motor de Coincidencias */}
-      {toast && <div className="floating-toast-alert">{toast}</div>}
+      {toast && (
+        <div className="custom-modal-overlay" onClick={() => setToast(null)}>
+          <div className={`custom-modal ${toastType === 'error' ? 'modal-error' : 'modal-success'}`} onClick={e => e.stopPropagation()}>
+            <div className="modal-icon">{toastType === 'error' ? '❌' : '✅'}</div>
+            <p className="modal-message">{toast}</p>
+            <button className="modal-close-btn" onClick={() => setToast(null)}>Aceptar</button>
+          </div>
+        </div>
+      )}
 
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Sanos y Salvos Logo" className="sidebar-logo-img" />
+          <img src={process.env.PUBLIC_URL + '/logo.png'} alt="Logo" className="sidebar-logo-img" />
           <div>
             <h3>Sanos y Salvos</h3>
-            <span className="role-badge">{userRole === 'ADMIN_ORGANIZACION' || userRole === 'ADMIN_ORG' ? '🏢 Fundación' : '👤 Usuario'}</span>
+            <span className="role-badge">{userRole === 'ADMIN_ORGANIZACION' || userRole === 'ADMIN_ORG' ? 'Fundacion' : 'Usuario'}</span>
           </div>
         </div>
-
         <nav className="sidebar-menu">
-          <button className={`menu-item ${activeTab === 'avisos' ? 'active' : ''}`} onClick={() => setActiveTab('avisos')}>🔍 Buscar Avisos</button>
-          <button className={`menu-item ${activeTab === 'publicar' ? 'active' : ''}`} onClick={() => setActiveTab('publicar')}>📢 Publicar Alerta</button>
-          <button className={`menu-item ${activeTab === 'organizaciones' ? 'active' : ''}`} onClick={() => setActiveTab('organizaciones')}>🏢 Organizaciones</button>
-          <button className={`menu-item ${activeTab === 'coincidencias' ? 'active' : ''}`} onClick={() => setActiveTab('coincidencias')}>🤝 Coincidencias <span className="notif-count">{coincidencias.length}</span></button>
+          <button className={'menu-item' + (activeTab === 'avisos' ? ' active' : '')} onClick={() => setActiveTab('avisos')}>Buscar Avisos</button>
+          <button className={'menu-item' + (activeTab === 'publicar' ? ' active' : '')} onClick={() => setActiveTab('publicar')}>Publicar Alerta</button>
+          <button className={'menu-item' + (activeTab === 'organizaciones' ? ' active' : '')} onClick={() => setActiveTab('organizaciones')}>Organizaciones</button>
+          <button className={'menu-item' + (activeTab === 'coincidencias' ? ' active' : '')} onClick={() => setActiveTab('coincidencias')}>Coincidencias <span className="notif-count">{coincidencias.length}</span></button>
         </nav>
-
-        <button onClick={() => setIsLoggedIn(false)} className="btn-logout">🚪 Cerrar Sesión</button>
+        <div className="sidebar-user-profile">
+          <div className="profile-avatar">
+            {loginForm.username ? loginForm.username.charAt(0).toUpperCase() : 'U'}
+          </div>
+          <div className="profile-info">
+            <span className="profile-email">{loginForm.username || 'Usuario'}</span>
+            <span className="role-badge">{userRole === 'ADMIN_ORGANIZACION' || userRole === 'ADMIN_ORG' ? 'Fundacion' : 'Usuario'}</span>
+          </div>
+          <button onClick={() => { setIsLoggedIn(false); setAuthToken(null); localStorage.removeItem('luna_token'); localStorage.removeItem('luna_rol'); }} className="btn-logout" title="Cerrar sesión">⏻</button>
+        </div>
       </aside>
 
       <main className="content-area">
@@ -489,12 +452,13 @@ function App() {
               <input type="text" placeholder="Buscar por nombre, raza o comuna..." className="search-bar" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
 
-            {/* BARRA DE FILTROS AVANZADOS COMBINADOS */}
+            {cargando && <p>Cargando mascotas desde el servidor...</p>}
+
             <div className="advanced-filter-ribbon">
               <div className="status-pill-group">
-                <button className={`pill-btn ${statusFilter === 'TODOS' ? 'active' : ''}`} onClick={() => setStatusFilter('TODOS')}>Todos ({avisos.length})</button>
-                <button className={`pill-btn lost ${statusFilter === 'PERDIDO' ? 'active' : ''}`} onClick={() => setStatusFilter('PERDIDO')}>Perdidos 🔴</button>
-                <button className={`pill-btn found ${statusFilter === 'ENCONTRADO' ? 'active' : ''}`} onClick={() => setStatusFilter('ENCONTRADO')}>Encontrados 🟢</button>
+                <button className={'pill-btn' + (statusFilter === 'TODOS' ? ' active' : '')} onClick={() => setStatusFilter('TODOS')}>Todos ({avisos.length})</button>
+                <button className={'pill-btn lost' + (statusFilter === 'PERDIDO' ? ' active' : '')} onClick={() => setStatusFilter('PERDIDO')}>Perdidos</button>
+                <button className={'pill-btn found' + (statusFilter === 'ENCONTRADO' ? ' active' : '')} onClick={() => setStatusFilter('ENCONTRADO')}>Encontrados</button>
               </div>
               <div className="dropdown-filter-group">
                 <label>Especie:</label>
@@ -506,96 +470,69 @@ function App() {
               </div>
             </div>
 
-            {/* VISOR DE GEOLOCALIZACIÓN NATIVO CON OPENSTREETMAP */}
             <div className="real-map-wrapper">
               <MapContainer center={[-33.4372, -70.6506]} zoom={11} style={{ height: "300px", width: "100%", borderRadius: "16px" }}>
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                />
-                {avisosFiltrados.map(a => (
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+                {avisosConCoordenadas.map(a => (
                   <Marker key={a.id} position={[a.lat, a.lng]} icon={a.estado === 'PERDIDO' ? iconPerdido : iconEncontrado}>
                     <Popup>
-                      <strong>{a.nombre}</strong> ({a.estado})<br/>
-                      {a.raza} — {a.comuna}<br/>
+                      <strong>{a.nombre}</strong> ({a.estado})<br />
+                      {a.raza} - {a.comuna}<br />
                       <button className="btn-popup-view" onClick={() => setAvisoSeleccionado(a)}>Ver Detalles</button>
                     </Popup>
                   </Marker>
                 ))}
               </MapContainer>
-              <div className="map-badge-info">Visor Activo — OpenStreetMap & Leaflet</div>
+              <div className="map-badge-info">Visor Activo - OpenStreetMap y Leaflet</div>
             </div>
 
-            {/* GRIDS DE TARJETAS */}
             <div className="cards-grid">
               {avisosFiltrados.map(aviso => (
-                <div
-                  key={aviso.id}
-                  className={`pet-card ${aviso.estado.toLowerCase()}`}
-                  onClick={() => setAvisoSeleccionado(aviso)}
-                  style={{ cursor: 'pointer' }}
-                >
+                <div key={aviso.id} className={'pet-card ' + (aviso.estado || '').toLowerCase()} onClick={() => setAvisoSeleccionado(aviso)} style={{ cursor: 'pointer' }}>
                   <div className="pet-avatar-container">
                     {aviso.imagen ? (
-                      <img
-                        src={aviso.imagen}
-                        alt={aviso.nombre}
-                        className="pet-card-img"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'block';
-                        }}
-                      />
+                      <img src={aviso.imagen} alt={aviso.nombre} className="pet-card-img" onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'block'; }} />
                     ) : null}
-                    <span className="pet-avatar-fallback" style={{ display: aviso.imagen ? 'none' : 'block' }}>🐾</span>
+                    <span className="pet-avatar-fallback" style={{ display: aviso.imagen ? 'none' : 'block' }}>Pet</span>
                   </div>
-
-                  <span className={`status-tag ${aviso.estado.toLowerCase()}`}>{aviso.estado}</span>
+                  <span className={'status-tag ' + (aviso.estado || '').toLowerCase()}>{aviso.estado}</span>
                   <h3>{aviso.nombre}</h3>
                   <p><strong>Raza:</strong> {aviso.raza} ({aviso.especie})</p>
-                  <p><strong>📍 Ubicación:</strong> {aviso.comuna}</p>
-                  <p><strong>📞 Contacto:</strong> {aviso.contacto}</p>
+                  <p><strong>Ubicacion:</strong> {aviso.comuna}</p>
+                  <p><strong>Contacto:</strong> {aviso.contacto}</p>
                 </div>
               ))}
-              {avisosFiltrados.length === 0 && (
-                <p className="no-results-text">No se encontraron alertas que coincidan con los criterios.</p>
+              {avisosFiltrados.length === 0 && !cargando && (
+                <p className="no-results-text">No se encontraron alertas. Publica una nueva alerta para comenzar.</p>
               )}
             </div>
           </div>
         )}
 
-        {/* --- MODAL FLOTANTE DE DETALLES CON SECCIÓN DE COMENTARIOS/PISTAS --- */}
         {avisoSeleccionado && (
           <div className="modal-overlay" onClick={() => setAvisoSeleccionado(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <button className="modal-close-btn" onClick={() => setAvisoSeleccionado(null)}>×</button>
+              <button className="modal-close-btn" onClick={() => setAvisoSeleccionado(null)}>x</button>
               <div className="modal-layout">
                 <div className="modal-img-container">
                   {avisoSeleccionado.imagen ? (
-                    <img
-                      src={avisoSeleccionado.imagen}
-                      alt={avisoSeleccionado.nombre}
-                      className="modal-main-img"
-                      onError={(e) => { e.target.style.display = 'none'; }}
-                    />
+                    <img src={avisoSeleccionado.imagen} alt={avisoSeleccionado.nombre} className="modal-main-img" onError={(e) => { e.target.style.display = 'none'; }} />
                   ) : null}
-                  <span className="modal-fallback-icon">🐾</span>
+                  <span className="modal-fallback-icon">Pet</span>
                 </div>
                 <div className="modal-info-side">
-                  <span className={`status-tag-modal ${avisoSeleccionado.estado.toLowerCase()}`}>{avisoSeleccionado.estado}</span>
+                  <span className={'status-tag-modal ' + (avisoSeleccionado.estado || '').toLowerCase()}>{avisoSeleccionado.estado}</span>
                   <h2>{avisoSeleccionado.nombre}</h2>
                   <hr />
                   <p><strong>Especie:</strong> {avisoSeleccionado.especie}</p>
                   <p><strong>Raza:</strong> {avisoSeleccionado.raza}</p>
-                  <p><strong>📍 Sector / Comuna:</strong> {avisoSeleccionado.comuna}</p>
-                  <p><strong>🌐 Geolocalización:</strong> Lat: {avisoSeleccionado.lat.toFixed(4)} | Lng: {avisoSeleccionado.lng.toFixed(4)}</p>
-
-                  {/* SISTEMA DE INTEGRACIÓN DE PISTAS DE AVISTAMIENTOS */}
+                  <p><strong>Comuna:</strong> {avisoSeleccionado.comuna}</p>
+                  <p><strong>Geolocalizacion:</strong> Lat: {avisoSeleccionado.lat != null ? avisoSeleccionado.lat.toFixed(4) : 'N/A'} | Lng: {avisoSeleccionado.lng != null ? avisoSeleccionado.lng.toFixed(4) : 'N/A'}</p>
                   <div className="modal-comments-section">
-                    <h3>📌 Pistas y Avistamientos de la Red Civil</h3>
+                    <h3>Pistas y Avistamientos</h3>
                     <div className="comments-log-container">
                       {!avisoSeleccionado.comentarios || avisoSeleccionado.comentarios.length === 0 ? (
-                        <p className="no-comments-yet">Sin pistas en la bitácora todavía. Si lo has visto, aporta abajo.</p>
+                        <p className="no-comments-yet">Sin pistas aun.</p>
                       ) : (
                         avisoSeleccionado.comentarios.map((c, idx) => (
                           <div key={idx} className="comment-bubble">
@@ -606,19 +543,12 @@ function App() {
                       )}
                     </div>
                     <form onSubmit={handleAddComment} className="comment-input-form">
-                      <input
-                        type="text"
-                        placeholder="Escribe un avistamiento, punto de referencia o pista..."
-                        required
-                        value={nuevoComentario}
-                        onChange={e => setNuevoComentario(e.target.value)}
-                      />
+                      <input type="text" placeholder="Escribe un avistamiento..." required value={nuevoComentario} onChange={e => setNuevoComentario(e.target.value)} />
                       <button type="submit">Enviar</button>
                     </form>
                   </div>
-
                   <div className="modal-contact-box">
-                    <h3>📞 Datos de Contacto Directo:</h3>
+                    <h3>Contacto Directo:</h3>
                     <p className="modal-phone">{avisoSeleccionado.contacto}</p>
                   </div>
                 </div>
@@ -629,9 +559,8 @@ function App() {
 
         {activeTab === 'publicar' && (
           <div className="form-container-box" style={{ maxWidth: '900px' }}>
-            <h2>📢 Generar nueva alerta de rastreo</h2>
-            <p className="form-instructions-text">Ingresa los descriptores morfológicos y **haz clic en el mapa de la derecha** para fijar las coordenadas exactas sobre OpenStreetMap.</p>
-
+            <h2>Generar nueva alerta de rastreo</h2>
+            <p className="form-instructions-text">Ingresa los datos y haz clic en el mapa para fijar coordenadas.</p>
             <div className="publish-flex-layout">
               <form onSubmit={handlePublicar} className="pro-form" style={{ flex: 1 }}>
                 <div className="form-row">
@@ -653,7 +582,7 @@ function App() {
                     <input type="text" placeholder="Ej: Poodle" required value={nuevoAviso.raza} onChange={e => setNuevoAviso({ ...nuevoAviso, raza: e.target.value })} />
                   </div>
                   <div className="form-field">
-                    <label>Estado de la alerta</label>
+                    <label>Estado</label>
                     <select value={nuevoAviso.estado} onChange={e => setNuevoAviso({ ...nuevoAviso, estado: e.target.value })}>
                       <option value="PERDIDO">PERDIDO</option>
                       <option value="ENCONTRADO">ENCONTRADO</option>
@@ -661,29 +590,25 @@ function App() {
                   </div>
                 </div>
                 <div className="form-field">
-                  <label>Comuna del avistamiento</label>
+                  <label>Comuna</label>
                   <input type="text" placeholder="Ej: Providencia" required value={nuevoAviso.comuna} onChange={e => setNuevoAviso({ ...nuevoAviso, comuna: e.target.value })} />
                 </div>
                 <div className="form-field">
-                  <label>Teléfono de contacto</label>
+                  <label>Telefono de contacto</label>
                   <input type="text" placeholder="+569 XXXXXXXX" required value={nuevoAviso.contacto} onChange={e => setNuevoAviso({ ...nuevoAviso, contacto: e.target.value })} />
                 </div>
                 <div className="form-field">
-                  <label>Fotografía Real de la Mascota (Vista previa activa)</label>
+                  <label>Fotografia</label>
                   <input type="file" accept="image/*" onChange={handleImageChange} className="file-input-custom" />
                   {previewImage && <img src={previewImage} alt="Preview" className="form-image-preview-thumbnail" />}
                 </div>
-
                 <div className="coordinates-display-box">
-                  <strong>Punto Capturado:</strong> Lat: {nuevoAviso.lat.toFixed(5)} | Lng: {nuevoAviso.lng.toFixed(5)}
+                  <strong>Punto:</strong> Lat: {nuevoAviso.lat.toFixed(5)} | Lng: {nuevoAviso.lng.toFixed(5)}
                 </div>
-
                 <button type="submit" className="btn-submit">Despachar Alerta</button>
               </form>
-
-              {/* Mini-mapa interactivo para capturar clics espaciales */}
               <div className="interactive-capture-map">
-                <label className="map-capture-label">Haz clic en el punto de pérdida/avistamiento:</label>
+                <label className="map-capture-label">Haz clic en el mapa:</label>
                 <MapContainer center={[-33.4372, -70.6506]} zoom={12} style={{ height: "340px", width: "100%", borderRadius: "12px" }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <MapClickHandler />
@@ -696,41 +621,27 @@ function App() {
 
         {activeTab === 'organizaciones' && (
           <div>
-            <div className="content-header">
-              <h2>Fichero de Organizaciones y Fundaciones</h2>
-            </div>
+            <div className="content-header"><h2>Organizaciones y Fundaciones</h2></div>
             <div className="org-layout">
               {(userRole === 'ADMIN_ORGANIZACION' || userRole === 'ADMIN_ORG') && (
                 <div className="form-container-box side-form">
-                  <h3>Inscribir Fundación</h3>
+                  <h3>Inscribir Fundacion</h3>
                   <form onSubmit={handleRegistrarOrg} className="pro-form">
-                    <div className="form-field">
-                      <label>Nombre Corporativo</label>
-                      <input type="text" required value={nuevaOrg.nombre} onChange={e => setNuevaOrg({ ...nuevaOrg, nombre: e.target.value })} />
-                    </div>
-                    <div className="form-field">
-                      <label>RUT Institucional</label>
-                      <input type="text" placeholder="11.222.333-4" required value={nuevaOrg.rut} onChange={e => setNuevaOrg({ ...nuevaOrg, rut: e.target.value })} />
-                    </div>
-                    <div className="form-field">
-                      <label>Comuna Base</label>
-                      <input type="text" required value={nuevaOrg.comuna} onChange={e => setNuevaOrg({ ...nuevaOrg, comuna: e.target.value })} />
-                    </div>
-                    <div className="form-field">
-                      <label>Capacidad Máxima</label>
-                      <input type="text" required value={nuevaOrg.capacity} onChange={e => setNuevaOrg({ ...nuevaOrg, capacity: e.target.value })} />
-                    </div>
-                    <button type="submit" className="btn-submit">Guardar Base de Datos</button>
+                    <div className="form-field"><label>Nombre</label><input type="text" required value={nuevaOrg.nombre} onChange={e => setNuevaOrg({ ...nuevaOrg, nombre: e.target.value })} /></div>
+                    <div className="form-field"><label>RUT</label><input type="text" placeholder="11.222.333-4" required value={nuevaOrg.rut} onChange={e => setNuevaOrg({ ...nuevaOrg, rut: e.target.value })} /></div>
+                    <div className="form-field"><label>Comuna</label><input type="text" required value={nuevaOrg.comuna} onChange={e => setNuevaOrg({ ...nuevaOrg, comuna: e.target.value })} /></div>
+                    <div className="form-field"><label>Capacidad</label><input type="text" required value={nuevaOrg.capacity} onChange={e => setNuevaOrg({ ...nuevaOrg, capacity: e.target.value })} /></div>
+                    <button type="submit" className="btn-submit">Guardar</button>
                   </form>
                 </div>
               )}
               <div className="org-grid">
                 {organizaciones.map(o => (
                   <div key={o.id} className="org-card">
-                    <div className="org-icon">🏢</div>
+                    <div className="org-icon">Org</div>
                     <h3>{o.nombre}</h3>
                     <p><strong>RUT:</strong> {o.rut}</p>
-                    <p><strong>📍 Comuna:</strong> {o.comuna}</p>
+                    <p><strong>Comuna:</strong> {o.comuna}</p>
                     <span className="badge-active">Verificada</span>
                   </div>
                 ))}
@@ -741,18 +652,16 @@ function App() {
 
         {activeTab === 'coincidencias' && (
           <div>
-            <div className="content-header">
-              <h2>Motor de Coincidencias</h2>
-            </div>
+            <div className="content-header"><h2>Motor de Coincidencias</h2></div>
             <div className="coincidencias-list">
               {coincidencias.map(c => (
                 <div key={c.id} className="coincidencia-item">
                   <div className="coin-header">
-                    <span className="coin-percentage">🔥 {c.porcentaje}% de Match</span>
+                    <span className="coin-percentage">{c.porcentaje}% de Match</span>
                     <span className="coin-status">{c.estado}</span>
                   </div>
                   <h3>Mascota: {c.perdida}</h3>
-                  <p className="coin-desc">💡 {c.encontrada}</p>
+                  <p className="coin-desc">{c.encontrada}</p>
                 </div>
               ))}
             </div>
@@ -764,4 +673,3 @@ function App() {
 }
 
 export default App;
-
