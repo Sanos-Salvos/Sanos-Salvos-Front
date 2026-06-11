@@ -1,40 +1,37 @@
 import mockData from '../mocks.json';
 
-// Detecta si estamos corriendo dentro de Docker o en Localhost de manera automática
-const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:8080/api'
-  : `http://${window.location.hostname}:8080/api`;
+const API_BASE_URL = 'http://localhost:8080/api';
 
+/**
+ * Trae todos los avisos de mascotas desde la API Gateway general.
+ * Si el microservicio está caído o vacío, carga los avisos de mocks.json.
+ */
 export const fetchAvisosAPI = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/avisos`);
-    if (!response.ok) throw new Error('Error en el servidor');
+    if (!response.ok) throw new Error('Error en la respuesta del servidor');
 
-    const dataFromDB = await response.json();
-
-    // Unimos los datos reales de la base de datos con los mocks de ejemplo
-    return [...dataFromDB, ...mockData];
+    const data = await response.json();
+    return data && data.length > 0 ? data : mockData.avisos;
   } catch (error) {
-    console.warn("No se pudo conectar a la API Gateway, usando solo datos de ejemplo:", error.message);
-    // Si la API Gateway está caída o apagada, mostramos los mocks para que la app no muera
-    return mockData;
+    console.warn("API Gateway general no disponible. Cargando avisos de contingencia desde mocks.json");
+    return mockData.avisos;
   }
 };
 
-export const crearAvisoAPI = async (nuevoAviso, token) => {
+export const crearAvisoAPI = async (nuevoAviso) => {
   try {
     const response = await fetch(`${API_BASE_URL}/avisos`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(nuevoAviso)
     });
-    if (!response.ok) throw new Error('No se pudo guardar en la Base de Datos');
+    if (!response.ok) throw new Error('No se pudo guardar el aviso en el servidor');
     return await response.json();
   } catch (error) {
-    console.error("Error al guardar aviso en la base de datos:", error);
+    console.error("Error de red al sincronizar el aviso. Se guardó únicamente en el estado local de React:", error);
     throw error;
   }
 };

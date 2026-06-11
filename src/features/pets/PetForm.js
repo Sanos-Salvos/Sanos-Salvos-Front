@@ -1,94 +1,94 @@
 import React from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import { iconPerdido, iconEncontrado } from '../map/leafletIcons';
 
-function PetForm({
+export default function PetForm({
   nuevoAviso,
   setNuevoAviso,
   previewImage,
   handleImageChange,
-  handlePublicar,
-  triggerToast
+  handlePublicar
 }) {
 
-  // Subcomponente interno para capturar los clics del mapa
   function MapClickHandler() {
     useMapEvents({
-      click: (e) => {
-        setNuevoAviso(prev => ({ ...prev, lat: e.latlng.lat, lng: e.latlng.lng }));
-        triggerToast("📍 Coordenadas capturadas con éxito en el formulario perimetral.");
+      click(e) {
+        setNuevoAviso(prev => ({
+          ...prev,
+          lat: e.latlng.lat,
+          lng: e.latlng.lng
+        }));
       },
     });
     return null;
   }
 
   return (
-    <div className="form-container-box" style={{ maxWidth: '900px' }}>
+    <div className="pet-form-container" style={{ padding: '20px', fontFamily: 'sans-serif' }}>
       <h2>📢 Generar nueva alerta de rastreo</h2>
-      <p className="form-instructions-text">
-        Ingresa los descriptores morfológicos y **haz clic en el mapa de la derecha** para fijar las coordenadas exactas sobre OpenStreetMap.
-      </p>
+      <p style={{ color: '#6b7280', marginBottom: '20px' }}>Ingresa los datos reales para guardarlos en el servidor central.</p>
 
-      <div className="publish-flex-layout">
-        <form onSubmit={handlePublicar} className="pro-form" style={{ flex: 1 }}>
-          <div className="form-row">
-            <div className="form-field">
-              <label>Nombre de la mascota</label>
-              <input type="text" placeholder="Ej: Rocko" required value={nuevoAviso.nombre} onChange={e => setNuevoAviso({ ...nuevoAviso, nombre: e.target.value })} />
-            </div>
-            <div className="form-field">
-              <label>Especie</label>
-              <select value={nuevoAviso.especie} onChange={e => setNuevoAviso({ ...nuevoAviso, especie: e.target.value })}>
+      <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
+        <form onSubmit={handlePublicar} style={{ display: 'grid', gap: '14px', width: '100%', maxWidth: '450px' }}>
+          <div>
+            <label style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Nombre de la mascota *</label>
+            <input type="text" value={nuevoAviso.nombre} onChange={e => setNuevoAviso({...nuevoAviso, nombre: e.target.value})} placeholder="Ej: Rocko" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Especie</label>
+              <select value={nuevoAviso.especie} onChange={e => setNuevoAviso({...nuevoAviso, especie: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                 <option value="Perro">Perro</option>
                 <option value="Gato">Gato</option>
+                <option value="Otro">Otro</option>
               </select>
             </div>
-          </div>
-          <div className="form-row">
-            <div className="form-field">
-              <label>Raza</label>
-              <input type="text" placeholder="Ej: Poodle" required value={nuevoAviso.raza} onChange={e => setNuevoAviso({ ...nuevoAviso, raza: e.target.value })} />
-            </div>
-            <div className="form-field">
-              <label>Estado de la alerta</label>
-              <select value={nuevoAviso.estado} onChange={e => setNuevoAviso({ ...nuevoAviso, estado: e.target.value })}>
-                <option value="PERDIDO">PERDIDO</option>
-                <option value="ENCONTRADO">ENCONTRADO</option>
-              </select>
+            <div>
+              <label style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Raza</label>
+              <input type="text" value={nuevoAviso.raza} onChange={e => setNuevoAviso({...nuevoAviso, raza: e.target.value})} placeholder="Ej: Poodle" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
             </div>
           </div>
-          <div className="form-field">
-            <label>Comuna del avistamiento</label>
-            <input type="text" placeholder="Ej: Providencia" required value={nuevoAviso.comuna} onChange={e => setNuevoAviso({ ...nuevoAviso, comuna: e.target.value })} />
-          </div>
-          <div className="form-field">
-            <label>Teléfono de contacto</label>
-            <input type="text" placeholder="+569 XXXXXXXX" required value={nuevoAviso.contacto} onChange={e => setNuevoAviso({ ...nuevoAviso, contacto: e.target.value })} />
-          </div>
-          <div className="form-field">
-            <label>Fotografía Real de la Mascota (Vista previa activa)</label>
-            <input type="file" accept="image/*" onChange={handleImageChange} className="file-input-custom" />
-            {previewImage && <img src={previewImage} alt="Preview" className="form-image-preview-thumbnail" />}
+
+          <div>
+            <label style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Estado de la alerta</label>
+            <select value={nuevoAviso.estado} onChange={e => setNuevoAviso({...nuevoAviso, estado: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+              <option value="PERDIDO">PERDIDO</option>
+              <option value="ENCONTRADO">ENCONTRADO</option>
+            </select>
           </div>
 
-          <div className="coordinates-display-box">
-            <strong>Punto Capturado:</strong> Lat: {nuevoAviso.lat.toFixed(5)} | Lng: {nuevoAviso.lng.toFixed(5)}
+          <div>
+            <label style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Comuna del avistamiento *</label>
+            <input type="text" value={nuevoAviso.comuna} onChange={e => setNuevoAviso({...nuevoAviso, comuna: e.target.value})} placeholder="Ej: Providencia" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
           </div>
 
-          <button type="submit" className="btn-submit">Despachar Alerta</button>
+          <div>
+            <label style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>Teléfono de contacto *</label>
+            <input type="text" value={nuevoAviso.contacto} onChange={e => setNuevoAviso({...nuevoAviso, contacto: e.target.value})} placeholder="+569 XXXXXXXX" required style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+          </div>
+
+          <button type="submit" style={{ backgroundColor: '#4f46e5', color: 'white', padding: '12px', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
+            Despachar Alerta Real
+          </button>
         </form>
 
-        <div className="interactive-capture-map">
-          <label className="map-capture-label">Haz clic en el punto de pérdida/avistamiento:</label>
-          <MapContainer center={[-33.4372, -70.6506]} zoom={12} style={{ height: "340px", width: "100%", borderRadius: "12px" }}>
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        {/* ================= MAPA DE FORMULARIO CON ALTURA FIJA REAL ================= */}
+        <div style={{ flex: '1', minWidth: '320px', height: '450px', borderRadius: '16px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '12px', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+            <span style={{ fontWeight: 'bold', color: '#1e1b4b' }}>📍 Marca el punto en el mapa</span>
+            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#6b7280' }}>Lat: {nuevoAviso.lat.toFixed(4)} | Lng: {nuevoAviso.lng.toFixed(4)}</p>
+          </div>
+
+          <MapContainer center={[nuevoAviso.lat, nuevoAviso.lng]} zoom={12} style={{ height: '100%', width: '100%' }}>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <Marker position={[nuevoAviso.lat, nuevoAviso.lng]} />
             <MapClickHandler />
-            <Marker position={[nuevoAviso.lat, nuevoAviso.lng]} icon={nuevoAviso.estado === 'PERDIDO' ? iconPerdido : iconEncontrado} />
           </MapContainer>
         </div>
       </div>
     </div>
   );
 }
-
-export default PetForm;

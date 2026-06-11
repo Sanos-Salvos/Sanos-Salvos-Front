@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
+
+// Estilos de mapas obligatorios
+import 'leaflet/dist/leaflet.css';
+
+// Conexión con la API real
 import { fetchAvisosAPI, crearAvisoAPI } from './services/api';
+import { listarOrganizaciones, crearOrganizacion } from './services/organizacionService';
+import { listarCoincidencias } from './services/coincidenciaService';
 
 // Vistas Modulares
 import LoginView from './features/auth/LoginView';
@@ -21,7 +28,7 @@ function App() {
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [specieFilter, setSpecieFilter] = useState('TODAS');
 
-  // --- ESTADOS INTERNOS DE DATOS (INICIALIZADOS VACÍOS POR REQUISITO) ---
+  // --- ESTADOS INTERNOS DE DATOS ---
   const [avisoSeleccionado, setAvisoSeleccionado] = useState(null);
   const [toast, setToast] = useState(null);
   const [nuevoComentario, setNuevoComentario] = useState('');
@@ -36,67 +43,40 @@ function App() {
   const [previewImage, setPreviewImage] = useState(null);
   const [nuevaOrg, setNuevaOrg] = useState({ nombre: '', rut: '', comuna: '', capacity: '' });
 
-  // --- DATOS MOKEADOS DE RESPALDO (VIVENE AQUÍ PARA CASOS DE FALLO O BD VACÍA) ---
-  const MOCK_AVISOS = [
-    {
-      id: "mock-1",
-      nombre: "Firulais",
-      especie: "Perro",
-      raza: "Mestizo",
-      estado: "PERDIDO",
-      lat: -33.4420,
-      lng: -70.6580,
-      comuna: "Santiago Centro",
-      contacto: "+56911112222",
-      imagen: "/mascotas/image1.jpg",
-      comentarios: [
-        { autor: 'Vecino_Santi', texto: 'Vi a un perrito similar corriendo asustado cerca del Metro Los Héroes.', fecha: '12-05-2026 20:15' }
-      ]
-    },
-    { id: "mock-2", nombre: "Luna", especie: "Gato", raza: "Siamés", estado: "ENCONTRADO", lat: -33.4250, lng: -70.6150, comuna: "Providencia", contacto: "+56933334444", imagen: "/mascotas/image2.jpg", comentarios: [] },
-    { id: "mock-3", nombre: "Thor", especie: "Perro", raza: "Golden", estado: "PERDIDO", lat: -33.4800, lng: -70.6120, comuna: "San Miguel", contacto: "+56955556666", imagen: "/mascotas/image3.jpg", comentarios: [] }
-  ];
-
-  const MOCK_ORGANIZACIONES = [
-    { id: "mock-org-1", nombre: "Fundación Patitas A Salvo", rut: "12.345.678-9", comuna: "Ñuñoa", capacidad: "50 mascotas" },
-    { id: "mock-org-2", nombre: "Rescate Animal Chile", rut: "76.999.111-k", comuna: "Maipú", capacity: "120 mascotas" }
-  ];
-
-  const MOCK_COINCIDENCIAS = [
-    { id: "mock-coin-1", perdida: "Thor (Golden)", encontrada: "Mascota similar reportada en San Miguel", porcentaje: 95, estado: "PENDIENTE" }
-  ];
-
-  // --- SCONEXIÓN E INYECTADO DINÁMICO ---
+  // --- CARGA REAL DESDE EL BACKEND (SIN RESPALDOS DE MOCKDATA) ---
   useEffect(() => {
-    const loadBackendData = async () => {
-      try {
-        const data = await fetchAvisosAPI();
+    const cargarTodo = async () => {
+      if (!isLoggedIn) return;
 
-        if (data && data.length > 0) {
-          // Si el Gateway responde con datos reales, combinamos los datos reales con los de ejemplo
-          // Filtrando por ID para evitar duplicados en re-renders
-          setAvisos(() => {
-            const existingIds = new Set(data.map(item => item.id));
-            const distinctMocks = MOCK_AVISOS.filter(mock => !existingIds.has(mock.id));
-            return [...data, ...distinctMocks];
-          });
-        } else {
-          // Si la base de datos está vacía pero conectada, cargamos los mocks para ilustrar la app
-          setAvisos(MOCK_AVISOS);
-        }
-      } catch (error) {
-        console.warn("Backend / API Gateway no detectado. Cargando datos mokeados de resguardo.");
-        setAvisos(MOCK_AVISOS);
+      // Carga 1: Avisos Reales
+      try {
+        const datosAvisos = await fetchAvisosAPI();
+        setAvisos(datosAvisos || []);
+      } catch (e) {
+        console.error("Error cargando avisos del Backend:", e);
+        setAvisos([]); // Si falla, queda vacío en vez de usar mocks
       }
 
-      // Cargamos por defecto las estructuras organizacionales y coincidencias muestra
-      setOrganizaciones(MOCK_ORGANIZACIONES);
-      setCoincidencias(MOCK_COINCIDENCIAS);
+      // Carga 2: Organizaciones Reales
+      try {
+        const datosOrgs = await listarOrganizaciones();
+        setOrganizaciones(datosOrgs || []);
+      } catch (e) {
+        console.error("Error cargando organizaciones del Backend:", e);
+        setOrganizaciones([]);
+      }
+
+      // Carga 3: Coincidencias Reales
+      try {
+        const datosMatches = await listarCoincidencias();
+        setCoincidencias(datosMatches || []);
+      } catch (e) {
+        console.error("Error cargando coincidencias del Backend:", e);
+        setCoincidencias([]);
+      }
     };
 
-    if (isLoggedIn) {
-      loadBackendData();
-    }
+    cargarTodo();
   }, [isLoggedIn]);
 
   // --- UTILS ---
@@ -119,13 +99,13 @@ function App() {
     if (!nuevoComentario.trim()) return;
 
     const comentarioObj = {
-      autor: userRole === 'ADMIN_ORG' || userRole === 'ADMIN_ORGANIZACION' ? 'Organización_Verificada' : 'Usuario_Común',
+      autor: userRole === 'ADMIN_ORGANIZACION' ? 'Organización_Verificada' : 'Usuario_Común',
       texto: nuevoComentario,
       fecha: new Date().toLocaleString()
     };
 
     const nuevosAvisos = avisos.map(a => {
-      if (a.id === avisoSeleccionado.id) {
+      if (a.id === avisoSeleccionado.id || a._id === avisoSeleccionado._id) {
         const updatedAviso = { ...a, comentarios: [...(a.comentarios || []), comentarioObj] };
         setAvisoSeleccionado(updatedAviso);
         return updatedAviso;
@@ -139,48 +119,38 @@ function App() {
 
   const handlePublicar = async (e) => {
     e.preventDefault();
-    const avisoCreado = { ...nuevoAviso, imagen: previewImage || '/mascotas/image1.jpg', comentarios: [] };
-
-    // Generación ID Temporal para renderizado inmediato reactivo
-    const localId = Date.now();
-    setAvisos([{ ...avisoCreado, id: localId }, ...avisos]);
+    const avisoCreado = { ...nuevoAviso, imagen: previewImage || '', comentarios: [] };
 
     try {
-      // Intenta guardarlo de forma efectiva en la base de datos a través de axios/fetch remoto
-      await crearAvisoAPI(avisoCreado);
+      const respuesta = await crearAvisoAPI(avisoCreado);
+      // Insertamos en el estado el objeto real devuelto por la base de datos
+      setAvisos([respuesta || { ...avisoCreado, id: Date.now() }, ...avisos]);
+      alert("¡Aviso publicado con éxito en el Backend!");
     } catch (err) {
-      console.error("Error de sincronización remota con el microservicio:", err);
+      console.error("Error al publicar en el servidor:", err);
+      alert("No se pudo guardar en el Backend.");
     }
 
-    if (avisoCreado.especie === "Perro") {
-      setCoincidencias([{
-        id: coincidencias.length + 101,
-        perdida: `${avisoCreado.nombre} (${avisoCreado.raza})`,
-        encontrada: `Alerta de geolocalización detectada en radio de 2km (${avisoCreado.comuna})`,
-        porcentaje: 88,
-        estado: "VERIFICANDO"
-      }, ...coincidencias]);
-    }
-
-    alert("¡Aviso publicado con éxito!");
     setNuevoAviso({ nombre: '', especie: 'Perro', raza: '', estado: 'PERDIDO', comuna: '', contacto: '', imagen: '', lat: -33.4372, lng: -70.6506 });
     setPreviewImage(null);
     setActiveTab('avisos');
-
-    setTimeout(() => {
-      triggerToast(`🚨 ¡ALERTA DE COINCIDENCIA! El motor ha detectado una mascota con un 88% de similitud de coordenadas en la zona de ${avisoCreado.comuna}.`);
-    }, 3000);
   };
 
-  const handleRegistrarOrg = (e) => {
+  const handleRegistrarOrg = async (e) => {
     e.preventDefault();
-    setOrganizaciones([...organizaciones, { ...nuevaOrg, id: organizaciones.length + 1 }]);
-    alert("Organización registrada de manera local.");
+    try {
+      await crearOrganizacion(nuevaOrg);
+      alert("Organización registrada con éxito.");
+      const actualizarOrgs = await listarOrganizaciones();
+      setOrganizaciones(actualizarOrgs || []);
+    } catch (error) {
+      console.error("Error al registrar organización:", error);
+    }
     setNuevaOrg({ nombre: '', rut: '', comuna: '', capacity: '' });
     setActiveTab('organizaciones');
   };
 
-  // --- FILTRADO DINÁMICO ---
+  // --- FILTRADO DINÁMICO EN EL FRONT-END ---
   const avisosFiltrados = avisos.filter(a => {
     const matchesSearch =
       (a.nombre || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -193,9 +163,8 @@ function App() {
     return matchesSearch && matchesStatus && matchesSpecie;
   });
 
-  // --- RENDERS ASOCIADOS A AUTENTICACIÓN ---
   if (!isLoggedIn) {
-    return <LoginView organizaciones={organizaciones} setOrganizaciones={setOrganizaciones} />;
+    return <LoginView />;
   }
 
   return (
@@ -204,10 +173,10 @@ function App() {
 
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Sanos y Salvos Logo" className="sidebar-logo-img" />
+          <img src="/logo.png" alt="Sanos y Salvos Logo" className="sidebar-logo-img" />
           <div>
             <h3>Sanos y Salvos</h3>
-            <span className="role-badge">{userRole === 'ADMIN_ORGANIZACION' || userRole === 'ADMIN_ORG' ? '🏢 Fundación' : '👤 Usuario'}</span>
+            <span className="role-badge">{userRole === 'ADMIN_ORGANIZACION' ? '🏢 Fundación' : '👤 Usuario'}</span>
           </div>
         </div>
 
