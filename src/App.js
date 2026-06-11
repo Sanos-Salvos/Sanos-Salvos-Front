@@ -218,6 +218,13 @@ function App() {
   const handlePublicar = async (e) => {
     e.preventDefault();
     if (publicando) return;
+
+    // Validar que las coordenadas estén dentro de Chile
+    if (!CHILE_BOUNDS.contains(L.latLng(nuevoAviso.lat, nuevoAviso.lng))) {
+      triggerToast("Error: Las coordenadas deben estar dentro de Chile. Selecciona un punto válido en el mapa.", 'error');
+      return;
+    }
+
     setPublicando(true);
     try {
       const especieFinal = nuevoAviso.especie === 'Otros' ? (otroEspecie.trim() || 'Otro animal') : nuevoAviso.especie;
