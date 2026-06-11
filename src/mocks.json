@@ -1,0 +1,36 @@
+{
+  "avisos": [
+    {
+      "id": 1,
+      "nombre": "Firulais",
+      "especie": "Perro",
+      "raza": "Mestizo",
+      "estado": "PERDIDO",
+      "lat": -33.4420,
+      "lng": -70.6580,
+      "comuna": "Santiago Centro",
+      "contacto": "+56911112222",
+      "imagen": "",
+      "comentarios": []
+    },
+    {
+      "id": 2,
+      "nombre": "Luna",
+      "especie": "Gato",
+      "raza": "Siamés",
+      "estado": "ENCONTRADO",
+      "lat": -33.4250,
+      "lng": -70.6150,
+      "comuna": "Providencia",
+      "contacto": "+56933334444",
+      "imagen": "",
+      "comentarios": []
+    }
+  ],
+  "organizaciones": [
+    { "id": 1, "nombre": "Fundación Patitas A Salvo", "rut": "12.345.678-9", "comuna": "Ñuñoa", "capacidad": "50 mascotas" }
+  ],
+  "coincidencias": [
+    { "id": 101, "perdida": "Thor (Golden)", "encontrada": "Mascota similar reportada en San Miguel", "porcentaje": 95, "estado": "PENDIENTE" }
+  ]
+}
