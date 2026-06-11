@@ -46,6 +46,7 @@ function App() {
     return localStorage.getItem('luna_rol') || 'USER';
   });
   const [activeTab, setActiveTab] = useState('avisos');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [specieFilter, setSpecieFilter] = useState('TODAS');
