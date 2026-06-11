@@ -122,6 +122,7 @@ function App() {
     lat: -33.4372, lng: -70.6506
   });
   const [otroEspecie, setOtroEspecie] = useState('');
+  const [publicando, setPublicando] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [nuevaOrg, setNuevaOrg] = useState({ nombre: '', rut: '', comuna: '', capacity: '' });
@@ -216,6 +217,8 @@ function App() {
 
   const handlePublicar = async (e) => {
     e.preventDefault();
+    if (publicando) return;
+    setPublicando(true);
     try {
       const especieFinal = nuevoAviso.especie === 'Otros' ? (otroEspecie.trim() || 'Otro animal') : nuevoAviso.especie;
       const mascotaCreada = await crearMascota({
@@ -243,6 +246,8 @@ function App() {
     } catch (error) {
       console.error('Error al publicar:', error);
       triggerToast("Error al guardar en el servidor: " + error.message);
+    } finally {
+      setPublicando(false);
     }
   };
 
@@ -628,7 +633,7 @@ function App() {
                 <div className="coordinates-display-box">
                   <strong>Punto:</strong> Lat: {nuevoAviso.lat.toFixed(5)} | Lng: {nuevoAviso.lng.toFixed(5)}
                 </div>
-                <button type="submit" className="btn-submit">Despachar Alerta</button>
+                <button type="submit" className="btn-submit" disabled={publicando}>{publicando ? 'Publicando...' : 'Despachar Alerta'}</button>
               </form>
               <div className="interactive-capture-map">
                 <label className="map-capture-label">Haz clic en el mapa:</label>
