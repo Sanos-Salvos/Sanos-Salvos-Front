@@ -27,6 +27,14 @@ const iconEncontrado = new L.Icon({
   iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
 });
 
+// Limites de Chile para restringir el mapa
+const CHILE_BOUNDS = L.latLngBounds(
+  L.latLng(-56.5, -76.5),  // Suroeste (Cape Horn, costa Pacífico)
+  L.latLng(-17.5, -66)     // Noreste (Arica, frontera Argentina)
+);
+const CHILE_CENTER = [-35.5, -71];
+const CHILE_ZOOM = 5;
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return !!localStorage.getItem('luna_token');
@@ -398,7 +406,7 @@ function App() {
             <div className={`custom-modal ${toastType === 'error' ? 'modal-error' : 'modal-success'}`} onClick={e => e.stopPropagation()}>
               <div className="modal-icon">{toastType === 'error' ? '❌' : '✅'}</div>
               <p className="modal-message">{toast}</p>
-              <button className="modal-close-btn" onClick={() => setToast(null)}>Aceptar</button>
+              <button className="modal-close-btn-custom" onClick={() => setToast(null)}>Aceptar</button>
             </div>
           </div>
         )}
@@ -413,12 +421,16 @@ function App() {
           <div className={`custom-modal ${toastType === 'error' ? 'modal-error' : 'modal-success'}`} onClick={e => e.stopPropagation()}>
             <div className="modal-icon">{toastType === 'error' ? '❌' : '✅'}</div>
             <p className="modal-message">{toast}</p>
-            <button className="modal-close-btn" onClick={() => setToast(null)}>Aceptar</button>
+            <button className="modal-close-btn-custom" onClick={() => setToast(null)}>Aceptar</button>
           </div>
         </div>
       )}
 
-      <aside className="sidebar">
+      <button className="mobile-menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
+        {sidebarOpen ? '✕' : '☰'}
+      </button>
+      <div className={'sidebar-overlay' + (sidebarOpen ? ' active' : '')} onClick={() => setSidebarOpen(false)} />
+      <aside className={'sidebar' + (sidebarOpen ? ' open' : '')}>
         <div className="sidebar-brand">
           <img src={process.env.PUBLIC_URL + '/logo.png'} alt="Logo" className="sidebar-logo-img" />
           <div>
@@ -427,10 +439,10 @@ function App() {
           </div>
         </div>
         <nav className="sidebar-menu">
-          <button className={'menu-item' + (activeTab === 'avisos' ? ' active' : '')} onClick={() => setActiveTab('avisos')}>Buscar Avisos</button>
-          <button className={'menu-item' + (activeTab === 'publicar' ? ' active' : '')} onClick={() => setActiveTab('publicar')}>Publicar Alerta</button>
-          <button className={'menu-item' + (activeTab === 'organizaciones' ? ' active' : '')} onClick={() => setActiveTab('organizaciones')}>Organizaciones</button>
-          <button className={'menu-item' + (activeTab === 'coincidencias' ? ' active' : '')} onClick={() => setActiveTab('coincidencias')}>Coincidencias <span className="notif-count">{coincidencias.length}</span></button>
+          <button className={'menu-item' + (activeTab === 'avisos' ? ' active' : '')} onClick={() => { setActiveTab('avisos'); setSidebarOpen(false); }}>Buscar Avisos</button>
+          <button className={'menu-item' + (activeTab === 'publicar' ? ' active' : '')} onClick={() => { setActiveTab('publicar'); setSidebarOpen(false); }}>Publicar Alerta</button>
+          <button className={'menu-item' + (activeTab === 'organizaciones' ? ' active' : '')} onClick={() => { setActiveTab('organizaciones'); setSidebarOpen(false); }}>Organizaciones</button>
+          <button className={'menu-item' + (activeTab === 'coincidencias' ? ' active' : '')} onClick={() => { setActiveTab('coincidencias'); setSidebarOpen(false); }}>Coincidencias <span className="notif-count">{coincidencias.length}</span></button>
         </nav>
         <div className="sidebar-user-profile">
           <div className="profile-avatar">
@@ -471,7 +483,7 @@ function App() {
             </div>
 
             <div className="real-map-wrapper">
-              <MapContainer center={[-33.4372, -70.6506]} zoom={11} style={{ height: "300px", width: "100%", borderRadius: "16px" }}>
+              <MapContainer center={CHILE_CENTER} zoom={CHILE_ZOOM} minZoom={4} maxZoom={18} maxBounds={CHILE_BOUNDS} maxBoundsViscosity={0.9} style={{ height: "300px", width: "100%", borderRadius: "16px" }}>
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
                 {avisosConCoordenadas.map(a => (
                   <Marker key={a.id} position={[a.lat, a.lng]} icon={a.estado === 'PERDIDO' ? iconPerdido : iconEncontrado}>
@@ -609,7 +621,7 @@ function App() {
               </form>
               <div className="interactive-capture-map">
                 <label className="map-capture-label">Haz clic en el mapa:</label>
-                <MapContainer center={[-33.4372, -70.6506]} zoom={12} style={{ height: "340px", width: "100%", borderRadius: "12px" }}>
+                <MapContainer center={CHILE_CENTER} zoom={CHILE_ZOOM} minZoom={4} maxZoom={18} maxBounds={CHILE_BOUNDS} maxBoundsViscosity={0.9} style={{ height: "340px", width: "100%", borderRadius: "12px" }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <MapClickHandler />
                   <Marker position={[nuevoAviso.lat, nuevoAviso.lng]} icon={nuevoAviso.estado === 'PERDIDO' ? iconPerdido : iconEncontrado} />

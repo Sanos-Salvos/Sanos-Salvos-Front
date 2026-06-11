@@ -301,6 +301,7 @@ body {
   padding: 25px;
   box-sizing: border-box;
   flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-brand {
@@ -648,6 +649,52 @@ body {
 .coin-desc { color: #475569; font-style: italic; background: #fafafa; padding: 8px; border-radius: 6px; font-size: 13px; }
 
 
+/* --- MOBILE MENU TOGGLE & SIDEBAR OVERLAY --- */
+.mobile-menu-toggle {
+  display: none;
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 1100;
+  background: var(--sidebar-bg);
+  color: white;
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  font-size: 22px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transition: background 0.2s;
+}
+
+.mobile-menu-toggle:hover {
+  background: var(--primary-color);
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.5);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.sidebar-overlay.active {
+  display: block;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+
 /* --- BARRA DE FILTROS AVANZADOS --- */
 .advanced-filter-ribbon {
   display: flex;
@@ -822,7 +869,8 @@ body {
 .custom-modal.modal-error { border-top: 4px solid #ef4444; }
 .modal-icon { font-size: 48px; margin-bottom: 12px; }
 .modal-message { color: white; font-size: 15px; line-height: 1.5; margin: 0 0 20px; }
-.modal-close-btn {
+
+.modal-close-btn-custom {
   background: linear-gradient(135deg, #7c3aed, #a78bfa);
   color: white;
   border: none;
@@ -833,7 +881,7 @@ body {
   cursor: pointer;
   transition: all 0.2s;
 }
-.modal-close-btn:hover { transform: scale(1.05); box-shadow: 0 4px 15px rgba(124,58,237,0.4); }
+.modal-close-btn-custom:hover { transform: scale(1.05); box-shadow: 0 4px 15px rgba(124,58,237,0.4); }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
@@ -897,6 +945,237 @@ body {
 }
 
 
+/* ============================================================
+   RESPONSIVE MEDIA QUERIES
+   ============================================================ */
 
+/* --- TABLET (1024px) --- */
+@media (max-width: 1024px) {
+  /* Login: hide side panels, center card */
+  .login-page {
+    grid-template-columns: 1fr;
+    padding: 20px;
+    justify-items: center;
+  }
+  .login-side-panel {
+    display: none;
+  }
+  .login-card {
+    max-width: 420px;
+  }
 
+  /* Dashboard: show hamburger, sidebar off-screen */
+  .mobile-menu-toggle {
+    display: flex;
+  }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 1000;
+    transform: translateX(-100%);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .content-area {
+    padding: 70px 25px 25px 25px;
+  }
 
+  /* Search bar smaller */
+  .search-bar {
+    width: 260px;
+  }
+
+  /* Map height */
+  .real-map-wrapper .leaflet-container {
+    height: 250px !important;
+  }
+
+  /* Publish layout: stack */
+  .publish-flex-layout {
+    flex-direction: column;
+  }
+  .interactive-capture-map {
+    width: 100%;
+  }
+
+  /* Org layout: stack */
+  .org-layout {
+    flex-direction: column;
+  }
+  .side-form {
+    width: 100%;
+  }
+}
+
+/* --- SMALL TABLET (768px) --- */
+@media (max-width: 768px) {
+  /* Content header: stack */
+  .content-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .content-header h2 {
+    font-size: 22px;
+  }
+  .search-bar {
+    width: 100%;
+  }
+
+  /* Cards grid: 2 columns */
+  .cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+
+  /* Filter ribbon: stack */
+  .advanced-filter-ribbon {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .status-pill-group {
+    flex-wrap: wrap;
+  }
+
+  /* Modal: full width, stack layout */
+  .modal-content {
+    width: 95%;
+    max-width: none;
+    padding: 20px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-layout {
+    flex-direction: column;
+  }
+  .modal-img-container {
+    width: 100%;
+    height: 220px;
+  }
+  .modal-info-side h2 {
+    font-size: 22px;
+  }
+
+  /* Forms: stack rows */
+  .form-row {
+    flex-direction: column;
+  }
+
+  /* Map height reduced */
+  .real-map-wrapper .leaflet-container {
+    height: 200px !important;
+  }
+
+  /* Org grid: 2 columns */
+  .org-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* --- MOBILE (480px) --- */
+@media (max-width: 480px) {
+  /* Login adjustments */
+  .login-page {
+    min-height: 100vh;
+    padding: 15px;
+  }
+  .login-card {
+    padding: 25px 20px;
+    border-radius: 20px;
+  }
+  .login-logo-img {
+    max-width: 160px;
+  }
+  .fixed-mini-logo {
+    width: 55px;
+    height: 55px;
+    top: 15px;
+    left: 15px;
+  }
+
+  /* Sidebar adjustments */
+  .sidebar {
+    width: 260px;
+    padding: 20px;
+  }
+  .content-area {
+    padding: 65px 15px 15px 15px;
+  }
+
+  /* Cards grid: 1 column */
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Cards smaller padding */
+  .pet-card {
+    padding: 15px;
+  }
+
+  /* Filter ribbon pills wrap */
+  .pill-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  /* Modal: near full screen */
+  .modal-content {
+    width: 100%;
+    border-radius: 14px;
+    padding: 15px;
+  }
+  .modal-img-container {
+    height: 180px;
+  }
+  .modal-info-side h2 {
+    font-size: 20px;
+  }
+  .modal-comments-section {
+    max-height: 150px;
+  }
+
+  /* Form container */
+  .form-container-box {
+    padding: 20px 15px;
+  }
+
+  /* Publish map */
+  .interactive-capture-map .leaflet-container {
+    height: 250px !important;
+  }
+
+  /* Org grid: 1 column */
+  .org-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Toast notification */
+  .floating-toast-alert {
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+
+  /* Custom modal */
+  .custom-modal {
+    padding: 24px 20px;
+    max-width: 300px;
+  }
+
+  /* Comment input */
+  .comment-input-form {
+    flex-direction: column;
+  }
+
+  /* Sidebar overlay z-index above sidebar */
+  .sidebar-overlay.active {
+    z-index: 999;
+  }
+  .sidebar.open {
+    z-index: 1000;
+  }
+}
