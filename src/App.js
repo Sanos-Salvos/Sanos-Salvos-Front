@@ -121,6 +121,7 @@ function App() {
     comuna: '', contacto: '', imagen: '',
     lat: -33.4372, lng: -70.6506
   });
+  const [otroEspecie, setOtroEspecie] = useState('');
   const [previewImage, setPreviewImage] = useState(null);
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [nuevaOrg, setNuevaOrg] = useState({ nombre: '', rut: '', comuna: '', capacity: '' });
@@ -216,9 +217,10 @@ function App() {
   const handlePublicar = async (e) => {
     e.preventDefault();
     try {
+      const especieFinal = nuevoAviso.especie === 'Otros' ? (otroEspecie.trim() || 'Otro animal') : nuevoAviso.especie;
       const mascotaCreada = await crearMascota({
         nombre: nuevoAviso.nombre,
-        especie: nuevoAviso.especie,
+        especie: especieFinal,
         raza: nuevoAviso.raza,
         estado: nuevoAviso.estado,
         lat: nuevoAviso.lat,
@@ -234,6 +236,7 @@ function App() {
 
       triggerToast("Aviso publicado con éxito!");
       setNuevoAviso({ nombre: '', especie: 'Perro', raza: '', estado: 'PERDIDO', comuna: '', contacto: '', imagen: '', lat: -33.4372, lng: -70.6506 });
+      setOtroEspecie('');
       setPreviewImage(null);
       setActiveTab('avisos');
 
@@ -270,7 +273,10 @@ function App() {
       (a.comuna || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (a.raza || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'TODOS' || a.estado === statusFilter;
-    const matchesSpecie = specieFilter === 'TODAS' || (a.especie || '').toUpperCase() === specieFilter;
+    const matchesSpecie = specieFilter === 'TODAS' ||
+      (specieFilter === 'PERRO' && (a.especie || '').toLowerCase() === 'perro') ||
+      (specieFilter === 'GATO' && (a.especie || '').toLowerCase() === 'gato') ||
+      (specieFilter === 'OTROS' && !['perro', 'gato'].includes((a.especie || '').toLowerCase()));
     return matchesSearch && matchesStatus && matchesSpecie;
   });
 
@@ -294,7 +300,7 @@ function App() {
                   {aviso.imagen ? (
                     <img src={aviso.imagen} alt={aviso.nombre} className="mini-card-img" onError={(e) => { e.target.style.display = 'none'; }} />
                   ) : (
-                    <span className="mini-card-emoji">{aviso.especie === 'Gato' ? '🐱' : '🐶'}</span>
+                    <span className="mini-card-emoji">{aviso.especie === 'Gato' ? '🐱' : aviso.especie === 'Perro' ? '🐶' : '🐾'}</span>
                   )}
                 </div>
                 <span className={`mini-alert-badge ${aviso.estado === 'PERDIDO' ? 'lost' : 'found'}`}>
@@ -382,7 +388,7 @@ function App() {
                   {aviso.imagen ? (
                     <img src={aviso.imagen} alt={aviso.nombre} className="mini-card-img" onError={(e) => { e.target.style.display = 'none'; }} />
                   ) : (
-                    <span className="mini-card-emoji">{aviso.especie === 'Gato' ? '🐱' : '🐶'}</span>
+                    <span className="mini-card-emoji">{aviso.especie === 'Gato' ? '🐱' : aviso.especie === 'Perro' ? '🐶' : '🐾'}</span>
                   )}
                 </div>
                 <span className={`mini-alert-badge ${aviso.estado === 'PERDIDO' ? 'lost' : 'found'}`}>
@@ -478,6 +484,7 @@ function App() {
                   <option value="TODAS">Todas las especies</option>
                   <option value="PERRO">Perros</option>
                   <option value="GATO">Gatos</option>
+                  <option value="OTROS">Otros</option>
                 </select>
               </div>
             </div>
@@ -585,7 +592,11 @@ function App() {
                     <select value={nuevoAviso.especie} onChange={e => setNuevoAviso({ ...nuevoAviso, especie: e.target.value })}>
                       <option value="Perro">Perro</option>
                       <option value="Gato">Gato</option>
+                      <option value="Otros">Otros</option>
                     </select>
+                    {nuevoAviso.especie === 'Otros' && (
+                      <input type="text" placeholder="Ej: Conejo, Tortuga, Ave..." value={otroEspecie} onChange={e => setOtroEspecie(e.target.value)} style={{ marginTop: '8px' }} />
+                    )}
                   </div>
                 </div>
                 <div className="form-row">
