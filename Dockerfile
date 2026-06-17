@@ -1,22 +1,19 @@
-# Build stage
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Instalar dependencias de build
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copiar el código fuente y compilar
 COPY . .
 RUN npm run build
 
-# Production image
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV PORT=3000
+ENV NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8080
 
-# Copiar solo lo necesario para ejecutar la aplicación
 COPY package.json package-lock.json ./
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
