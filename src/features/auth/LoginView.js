@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { useAuth } from '../../context/AuthContext';
 import { login as loginBFF, register as registerBFF } from '../../services/authService';
 
@@ -64,16 +65,15 @@ export default function LoginView() {
         gap: '12px',
         zIndex: 10
       }}>
-        <img
+        <Image
           src="/logo.png"
           alt="Sanos y Salvos Esquina"
+          width={80}
+          height={80}
           style={{
-            width: '80px',
-            height: '80px',
             objectFit: 'contain',
             filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.25))'
           }}
-          onError={(e) => { e.target.src = 'https://placehold.co/55x55?text=🐾'; }}
         />
         <span style={{
           color: '#ffffff',
@@ -110,16 +110,15 @@ export default function LoginView() {
           marginBottom: '32px',
           width: '100%'
         }}>
-          <img
+          <Image
             src="/logo.png"
             alt="Sanos y Salvos Logo"
+            width={85}
+            height={85}
             style={{
-              width: '85px',
-              height: '85px',
               objectFit: 'contain',
               marginBottom: '12px'
             }}
-            onError={(e) => { e.target.src = 'https://placehold.co/85x85?text=🐾'; }}
           />
           <h1 style={{
             fontSize: '28px',

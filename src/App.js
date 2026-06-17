@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useAuth } from './context/AuthContext';
-
-// Estilos de mapas obligatorios
-import 'leaflet/dist/leaflet.css';
 
 // Conexión con la API real
 import { fetchAvisosAPI, crearAvisoAPI } from './services/api';
@@ -16,8 +14,6 @@ import PetForm from './features/pets/PetForm';
 import OrganizationsView from './features/pets/OrganizationsView';
 import MatchingDashboard from './features/pets/MatchingDashboard';
 import PetDetailModal from './features/pets/PetDetailModal';
-
-import './App.css';
 
 function App() {
   const { isLoggedIn, userRole, logout } = useAuth();
@@ -173,7 +169,7 @@ function App() {
 
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <img src="/logo.png" alt="Sanos y Salvos Logo" className="sidebar-logo-img" />
+          <Image src="/logo.png" alt="Sanos y Salvos Logo" width={40} height={40} className="sidebar-logo-img" />
           <div>
             <h3>Sanos y Salvos</h3>
             <span className="role-badge">{userRole === 'ADMIN_ORGANIZACION' ? '🏢 Fundación' : '👤 Usuario'}</span>
