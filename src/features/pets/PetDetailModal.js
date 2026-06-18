@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 function PetDetailModal({ aviso, onClose, nuevoComentario, setNuevoComentario, onAddComment }) {
   if (!aviso) return null;
@@ -8,13 +9,15 @@ function PetDetailModal({ aviso, onClose, nuevoComentario, setNuevoComentario, o
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close-btn" onClick={onClose}>×</button>
         <div className="modal-layout">
-          <div className="modal-img-container">
+          <div className="modal-img-container" style={{ position: 'relative' }}>
             {aviso.imagen ? (
-              <img
+              <Image
                 src={aviso.imagen}
                 alt={aviso.nombre}
+                width={280}
+                height={280}
                 className="modal-main-img"
-                onError={(e) => { e.target.style.display = 'none'; }}
+                unoptimized
               />
             ) : null}
             <span className="modal-fallback-icon">🐾</span>
